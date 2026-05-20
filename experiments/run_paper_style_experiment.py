@@ -4,6 +4,7 @@ import argparse
 import copy
 import json
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -203,10 +204,22 @@ def clone_config(config: dict) -> dict:
     return copy.deepcopy(config)
 
 
-def run_nominal_comparison(config: dict) -> tuple[pd.DataFrame, dict]:
+def save_partial_frame(out_dir: Path, file_name: str, records: list[dict]) -> None:
+    out_dir.mkdir(exist_ok=True)
+    pd.DataFrame(records).to_csv(out_dir / file_name, index=False)
+
+
+def run_nominal_comparison(config: dict, out_dir: Path | None = None) -> tuple[pd.DataFrame, dict]:
     records = []
+    study_start = time.time()
+    print("[nominal] running adaptive controller")
     adaptive = evaluate_closed_loop(config, mode="adaptive")
+    if out_dir is not None:
+        with (out_dir / "adaptive_trace.json").open("w", encoding="utf-8") as handle:
+            json.dump(adaptive, handle, indent=2)
     for epsilon in config["evaluation"]["epsilon_grid"]:
+        epsilon_start = time.time()
+        print(f"[nominal] running fixed epsilon={epsilon}")
         res = evaluate_closed_loop(config, mode="fixed", fixed_epsilon=epsilon)
         records.append(
             {
@@ -224,6 +237,9 @@ def run_nominal_comparison(config: dict) -> tuple[pd.DataFrame, dict]:
                 "t_ini": res["t_ini"],
             }
         )
+        print(f"[nominal] finished epsilon={epsilon} in {time.time() - epsilon_start:.1f}s")
+        if out_dir is not None:
+            save_partial_frame(out_dir, "paper_style_nominal_comparison.csv", records)
     records.append(
         {
             "study": "nominal_comparison",
@@ -240,15 +256,21 @@ def run_nominal_comparison(config: dict) -> tuple[pd.DataFrame, dict]:
             "t_ini": adaptive["t_ini"],
         }
     )
+    if out_dir is not None:
+        save_partial_frame(out_dir, "paper_style_nominal_comparison.csv", records)
+    print(f"[nominal] complete in {time.time() - study_start:.1f}s")
     return pd.DataFrame(records), adaptive
 
 
-def run_epsilon_sweep(config: dict) -> pd.DataFrame:
+def run_epsilon_sweep(config: dict, out_dir: Path | None = None) -> pd.DataFrame:
     records = []
+    study_start = time.time()
     for n_batches in config["evaluation"]["N_grid"]:
         local_config = clone_config(config)
         local_config["offline_data"]["N"] = int(n_batches)
         for epsilon in config["evaluation"]["epsilon_grid"]:
+            case_start = time.time()
+            print(f"[epsilon] running N={n_batches}, epsilon={epsilon}")
             res = evaluate_closed_loop(local_config, mode="fixed", fixed_epsilon=epsilon)
             records.append(
                 {
@@ -263,16 +285,23 @@ def run_epsilon_sweep(config: dict) -> pd.DataFrame:
                     "t_ini": res["t_ini"],
                 }
             )
+            print(f"[epsilon] finished N={n_batches}, epsilon={epsilon} in {time.time() - case_start:.1f}s")
+            if out_dir is not None:
+                save_partial_frame(out_dir, "paper_style_epsilon_sweep.csv", records)
+    print(f"[epsilon] complete in {time.time() - study_start:.1f}s")
     return pd.DataFrame(records)
 
 
-def run_horizon_and_matrix_sweep(config: dict) -> pd.DataFrame:
+def run_horizon_and_matrix_sweep(config: dict, out_dir: Path | None = None) -> pd.DataFrame:
     records = []
+    study_start = time.time()
     for matrix_type in config["evaluation"]["matrix_types"]:
         for horizon in config["evaluation"]["T_grid"]:
             local_config = clone_config(config)
             local_config["controller"]["matrix_type"] = matrix_type
             local_config["offline_data"]["horizon"] = int(horizon)
+            case_start = time.time()
+            print(f"[horizon-matrix] running matrix_type={matrix_type}, horizon={horizon}")
             res = evaluate_closed_loop(local_config, mode="fixed", fixed_epsilon=config["controller"]["epsilon_nominal"])
             records.append(
                 {
@@ -286,14 +315,23 @@ def run_horizon_and_matrix_sweep(config: dict) -> pd.DataFrame:
                     "t_ini": res["t_ini"],
                 }
             )
+            print(
+                f"[horizon-matrix] finished matrix_type={matrix_type}, horizon={horizon} in {time.time() - case_start:.1f}s"
+            )
+            if out_dir is not None:
+                save_partial_frame(out_dir, "paper_style_horizon_matrix_sweep.csv", records)
+    print(f"[horizon-matrix] complete in {time.time() - study_start:.1f}s")
     return pd.DataFrame(records)
 
 
-def run_tini_sweep(config: dict) -> pd.DataFrame:
+def run_tini_sweep(config: dict, out_dir: Path | None = None) -> pd.DataFrame:
     records = []
+    study_start = time.time()
     for t_ini in config["evaluation"]["T_ini_grid"]:
         local_config = clone_config(config)
         local_config["controller"]["T_ini"] = int(t_ini)
+        case_start = time.time()
+        print(f"[tini] running T_ini={t_ini}")
         res = evaluate_closed_loop(local_config, mode="fixed", fixed_epsilon=config["controller"]["epsilon_nominal"])
         records.append(
             {
@@ -306,6 +344,10 @@ def run_tini_sweep(config: dict) -> pd.DataFrame:
                 "matrix_type": res["matrix_type"],
             }
         )
+        print(f"[tini] finished T_ini={t_ini} in {time.time() - case_start:.1f}s")
+        if out_dir is not None:
+            save_partial_frame(out_dir, "paper_style_tini_sweep.csv", records)
+    print(f"[tini] complete in {time.time() - study_start:.1f}s")
     return pd.DataFrame(records)
 
 
@@ -342,14 +384,14 @@ def main():
     adaptive_trace: dict = {}
 
     if args.study in {"all", "nominal"}:
-        nominal, adaptive_trace = run_nominal_comparison(config)
+        nominal, adaptive_trace = run_nominal_comparison(config, out_dir=out_dir)
         frames["paper_style_nominal_comparison"] = nominal
     if args.study in {"all", "epsilon"}:
-        frames["paper_style_epsilon_sweep"] = run_epsilon_sweep(config)
+        frames["paper_style_epsilon_sweep"] = run_epsilon_sweep(config, out_dir=out_dir)
     if args.study in {"all", "horizon-matrix"}:
-        frames["paper_style_horizon_matrix_sweep"] = run_horizon_and_matrix_sweep(config)
+        frames["paper_style_horizon_matrix_sweep"] = run_horizon_and_matrix_sweep(config, out_dir=out_dir)
     if args.study in {"all", "tini"}:
-        frames["paper_style_tini_sweep"] = run_tini_sweep(config)
+        frames["paper_style_tini_sweep"] = run_tini_sweep(config, out_dir=out_dir)
 
     if not adaptive_trace:
         adaptive_trace = evaluate_closed_loop(config, mode="adaptive")
