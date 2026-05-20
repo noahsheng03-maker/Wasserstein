@@ -1,0 +1,50 @@
+seed: 7
+system:
+  dt: 0.04
+  process_noise_std: 0.005
+  measurement_noise_std: 0.01
+offline_data:
+  N: 1
+  horizon: 15500
+  input_std: 0.12
+  repeated_input: true
+controller:
+  T_ini: 6
+  T_f: 25
+  horizon_sim: 3
+  control_horizon: 1
+  alpha: 0.1
+  matrix_type: page
+  epsilon_nominal: 0.003
+constraints:
+  input_lower: [0.1597, -1.57079632679, -1.57079632679]
+  input_upper: [0.4791, 1.57079632679, 1.57079632679]
+  output_lower: [-0.6, -0.6, -0.6]
+  output_upper: [1.6, 1.6, 1.6]
+objective:
+  y_ref: [0.5, 0.5, 1.5]
+  hover_thrust: 0.27
+  thrust_weight: 16.0
+  rate_weight: 4.0
+  output_weight: 1600.0
+  past_weight: 750000.0
+  l_obj: 1.0
+  l_con: 1.0
+adaptive_radius:
+  epsilon_init: 0.003
+  epsilon_min: 0.001
+  epsilon_max: 0.03
+  eta_up: 0.02
+  eta_down: 0.004
+  error_ref: 0.02
+  stress_ref: 0.0
+  shift_ref: 0.0
+  weight_error: 1.0
+  weight_stress: 4.0
+  weight_shift: 1.0
+evaluation:
+  epsilon_grid: [0.001, 0.003, 0.01]
+  N_grid: [1, 10]
+  T_grid: [527, 15407]
+  matrix_types: [page, hankel]
+  T_ini_grid: [3, 6, 9]
