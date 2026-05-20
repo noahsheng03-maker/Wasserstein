@@ -1,0 +1,146 @@
+\documentclass[conference]{IEEEtran}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{bm}
+\usepackage{mathtools}
+\usepackage{cite}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage{hyperref}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  citecolor=black,
+  urlcolor=blue
+}
+
+\title{Adaptive Wasserstein Radius Selection for Distributionally Robust Data-Enabled Predictive Control}
+
+\author{\IEEEauthorblockN{Draft Manuscript for Research Proposal}}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Distributionally robust data-enabled predictive control (DR-DeePC) provides a promising framework for controlling unknown stochastic systems directly from input-output data while explicitly accounting for distributional ambiguity and output safety constraints. A critical design parameter in Wasserstein-based DR-DeePC is the ambiguity radius, which governs the trade-off between out-of-sample robustness and closed-loop control performance. Existing approaches typically rely on conservative theoretical bounds or manual tuning, limiting their practical deployment in time-varying and safety-critical settings. This paper proposes an adaptive Wasserstein radius selection framework for DR-DeePC. The method combines an offline data-driven initialization step with an online radius adaptation law driven by prediction mismatch, constraint stress, and distribution shift indicators. A safeguarded projection mechanism is incorporated to prevent the radius from shrinking below a reliability-preserving threshold. The resulting controller preserves the tractable structure of DR-DeePC while improving adaptability to changes in uncertainty statistics. We outline the problem formulation, the adaptive update mechanism, and the expected evaluation methodology. The proposed framework aims to reduce tuning effort and improve the performance-safety trade-off of DR-DeePC under nonstationary uncertainty.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Data-enabled predictive control, distributionally robust optimization, Wasserstein ambiguity set, adaptive robustness tuning, chance-constrained control.
+\end{IEEEkeywords}
+
+\section{Introduction}
+Model predictive control (MPC) is one of the most successful frameworks for constrained optimal control because it optimizes future control actions using explicit predictions of system behavior while handling state and input constraints in a systematic manner. However, classical MPC depends heavily on the availability of an accurate predictive model. In many real-world applications, including robotics, power electronics, transportation, and energy systems, deriving and maintaining a sufficiently accurate model can be difficult, expensive, or even infeasible. These challenges have motivated the rapid development of data-driven predictive control methods.
+
+Among such methods, data-enabled predictive control (DeePC) is particularly attractive because it avoids explicit model identification and directly uses historical input-output trajectories to synthesize future control actions. The key insight behind DeePC is that for a controllable linear time-invariant system, sufficiently rich historical data can be organized into a trajectory subspace from which future trajectories can be predicted. This allows DeePC to mimic model predictive control behavior while bypassing an explicit parametric model.
+
+Despite its elegance, DeePC becomes significantly more challenging in stochastic settings. In practice, measured data are corrupted by noise, the true disturbance distribution is unknown, and constraint satisfaction must be addressed under uncertainty. Distributionally robust DeePC addresses this issue by replacing a single estimated disturbance distribution with an ambiguity set of plausible distributions. In the Wasserstein-based formulation, the ambiguity set is chosen as a Wasserstein ball centered at the empirical distribution of the collected data. This yields a tractable optimization problem with probabilistic out-of-sample guarantees and explicit robustness against sample mismatch.
+
+A central but unresolved issue in Wasserstein DR-DeePC is the choice of the ambiguity radius. The radius determines the size of the uncertainty set. A radius that is too small may lead to optimistic designs that underperform when the true distribution differs from the empirical one. A radius that is too large can induce severe conservatism, resulting in degraded tracking performance, reduced control authority, and unnecessary constraint margins. Existing practice often relies on either theoretical concentration bounds, which are frequently too conservative for control applications, or empirical grid search, which is computationally expensive and unsuitable for online deployment.
+
+This paper focuses on the adaptive selection of the Wasserstein ambiguity radius in distributionally robust DeePC. The motivation is that uncertainty statistics may vary over time, and therefore a fixed ambiguity radius is unlikely to remain appropriate throughout closed-loop operation. Instead, the ambiguity radius should increase when model mismatch, distribution shift, or constraint stress become more pronounced, and it should decrease when the system returns to nominal behavior in order to recover performance.
+
+The main idea of this work is to introduce a two-layer architecture. The inner layer solves a standard Wasserstein DR-DeePC problem for a given radius. The outer layer adjusts the radius online using signals computed from recent closed-loop data. These signals include prediction mismatch, output constraint stress, and a measure of discrepancy between recent observations and the offline data distribution. To prevent unsafe underestimation of uncertainty, the online adaptation is combined with a safeguarded lower bound calibrated offline. This preserves the computational tractability of DR-DeePC while making the robustness level responsive to operating conditions.
+
+The contributions of the proposed study are summarized as follows.
+\begin{enumerate}
+    \item We formulate the Wasserstein radius selection problem for DR-DeePC as an adaptive closed-loop robustness tuning problem rather than a static offline hyperparameter search problem.
+    \item We propose a practical online radius update mechanism driven by measurable performance and safety indicators.
+    \item We introduce a safeguarded adaptation scheme that combines offline calibration with online adjustment to avoid excessive optimism.
+    \item We provide a structured experimental plan to evaluate fixed-radius and adaptive-radius DR-DeePC under stationary and nonstationary uncertainty scenarios.
+\end{enumerate}
+
+The remainder of this draft is organized as follows. Section~\ref{sec:method} presents the method framework, including the problem setup, the offline initialization procedure, the online adaptation law, and the safeguarded update mechanism.
+
+\section{Method Framework}
+\label{sec:method}
+
+\subsection{Problem Setup}
+We consider an unknown stochastic dynamical system controlled through a receding-horizon data-enabled predictive controller. Offline, repeated input-output experiments are performed to construct the DeePC data matrices and the empirical distribution associated with the noisy output trajectories. Online, at each time step, the controller observes the most recent input-output window and solves a Wasserstein distributionally robust DeePC problem over a finite horizon.
+
+Let $\epsilon_t$ denote the Wasserstein ambiguity radius used at time step $t$. For a fixed $\epsilon_t$, the inner-layer optimization takes the form of a standard distributionally robust DeePC problem in which the nominal sample-average objective is augmented by a robustness-induced regularization term and the safety constraints are enforced through a distributionally robust CVaR approximation. The detailed tractable reformulation follows the standard DR-DeePC derivation and is not modified in the inner layer. The novelty lies in how $\epsilon_t$ is initialized and updated.
+
+\subsection{Offline Radius Initialization}
+The first step of the proposed framework is to determine an initial ambiguity radius $\epsilon_0$ from data. Instead of relying only on theoretical concentration bounds, we propose to use a data-driven calibration procedure over a candidate set $\mathcal{E}$. Typical choices include logarithmically spaced values such as
+\begin{equation}
+\mathcal{E} = \{10^{-4}, 2\times 10^{-4}, 5\times 10^{-4}, \ldots, 10^{-1}\}.
+\end{equation}
+
+For each candidate radius, a DR-DeePC controller is constructed using a training subset of the offline dataset and evaluated on a validation subset. The validation score should reflect both performance and safety, for example
+\begin{equation}
+S(\epsilon) = J_{\mathrm{track}}(\epsilon) + \lambda_1 V_{\mathrm{rate}}(\epsilon) + \lambda_2 V_{\mathrm{cvar}}(\epsilon),
+\end{equation}
+where $J_{\mathrm{track}}$ is the tracking error, $V_{\mathrm{rate}}$ is the empirical constraint violation frequency, and $V_{\mathrm{cvar}}$ is a tail-risk surrogate associated with the observed violations. The best initial radius is then chosen as
+\begin{equation}
+\epsilon_0 = \arg\min_{\epsilon \in \mathcal{E}} S(\epsilon).
+\end{equation}
+This offline step produces a radius that is tuned for the available data and serves as the starting point for the online adaptation law.
+
+\subsection{Online Adaptive Radius Update}
+A fixed ambiguity radius is unlikely to remain optimal when the uncertainty distribution changes over time. To address this issue, we propose to adapt $\epsilon_t$ online using a small set of closed-loop indicators computed over a recent time window.
+
+The first indicator is the prediction mismatch
+\begin{equation}
+\bar e_t = \frac{1}{W}\sum_{k=t-W+1}^{t} \lVert y_k - \hat y_k \rVert,
+\end{equation}
+where $\hat y_k$ is the one-step or receding-horizon prediction generated by the DeePC controller. A sustained increase in prediction mismatch suggests that the current ambiguity set may be too small.
+
+The second indicator is the constraint stress
+\begin{equation}
+\bar s_t = \frac{1}{W}\sum_{k=t-W+1}^{t} \max\{0, h(y_k)\},
+\end{equation}
+where $h(y_k) \le 0$ denotes the output safety condition. This quantity captures how strongly the closed-loop trajectory is approaching or violating the desired safe set.
+
+The third indicator is a distribution shift estimate. Let $\mathcal{D}_{\mathrm{ref}}$ denote a reference dataset derived from offline trajectories, and let $\mathcal{D}_t$ denote a recent online data window. A discrepancy statistic $\bar d_t$ may be computed using a low-dimensional feature map or a sample Wasserstein distance surrogate between these two windows. An increase in $\bar d_t$ suggests that current operating conditions are no longer well represented by the offline training distribution.
+
+These three indicators are combined into an update law of the form
+\begin{equation}
+\epsilon_{t+1} = \Pi_{[\epsilon_{\min},\epsilon_{\max}]}\Big(
+\epsilon_t + \eta_1(\bar e_t - e_{\mathrm{ref}})
++ \eta_2(\bar s_t - s_{\mathrm{ref}})
++ \eta_3(\bar d_t - d_{\mathrm{ref}})
+\Big),
+\end{equation}
+where $\Pi$ denotes projection onto a prescribed interval, $\eta_i > 0$ are adaptation gains, and $e_{\mathrm{ref}}, s_{\mathrm{ref}}, d_{\mathrm{ref}}$ are nominal reference levels estimated from offline data or an initial calibration phase. This law enlarges the ambiguity radius when the controller observes evidence of mismatch or increased risk, and it reduces the radius when the system behaves consistently with nominal expectations.
+
+\subsection{Safeguarded Adaptation Mechanism}
+A fully unconstrained online adaptation law may shrink the ambiguity radius too aggressively and compromise safety. We therefore include a safeguard mechanism.
+
+First, the projection interval is selected so that
+\begin{equation}
+\epsilon_{\min} \ge \epsilon_{\mathrm{safe}},
+\end{equation}
+where $\epsilon_{\mathrm{safe}}$ is a conservatively calibrated lower bound obtained from offline reliability analysis, bootstrap calibration, or a conservative cross-validation procedure.
+
+Second, we use asymmetric adaptation gains to react quickly to risk increases and slowly to nominal recovery. Specifically,
+\begin{equation}
+\epsilon_{t+1}=
+\begin{cases}
+\Pi(\epsilon_t + \eta_{+} \Delta_t), & \Delta_t > 0, \\
+\Pi(\epsilon_t + \eta_{-} \Delta_t), & \Delta_t \le 0,
+\end{cases}
+\qquad \eta_{+} > \eta_{-} > 0,
+\end{equation}
+where $\Delta_t$ is the aggregated update signal. This prevents oscillatory or overly optimistic radius reduction.
+
+Third, the radius need not be updated at every time step. A slower update clock can be used so that the outer adaptation loop evolves on a longer time scale than the inner control loop. This reduces sensitivity to noise and helps maintain numerical stability.
+
+\subsection{Expected Properties and Evaluation}
+The proposed framework is designed to preserve the tractable structure of DR-DeePC because only the ambiguity radius is updated between optimization steps, while the inner problem formulation remains unchanged. The expected benefits are as follows.
+\begin{enumerate}
+    \item Reduced manual tuning effort compared with fixed-radius methods.
+    \item Improved tracking performance under nominal conditions through controlled radius reduction.
+    \item Improved safety robustness under disturbance changes, noise bursts, or distribution shifts through radius enlargement.
+    \item Better performance-safety trade-off than fixed conservative radii.
+\end{enumerate}
+
+To evaluate the method, we will compare the proposed adaptive-radius DR-DeePC against three baselines: a theoretically sized fixed radius, a manually tuned fixed radius, and a cross-validated fixed radius. Closed-loop experiments should include nominal scenarios, variance shifts, abrupt disturbance changes, and drifting noise statistics. The main evaluation metrics will be tracking error, empirical violation rate, CVaR-like tail violation score, computational time, and the trajectory of the adaptive radius itself.
+
+\section{Concluding Remark for the Draft}
+This draft outlines a practical and research-relevant extension of Wasserstein distributionally robust DeePC. The proposed direction does not alter the inner DeePC structure; instead, it equips the controller with an adaptive mechanism for selecting the ambiguity radius based on observed closed-loop behavior. This makes the resulting controller more suitable for real operating environments where uncertainty statistics are not stationary. The next stage of the work will formalize the adaptation law, analyze its closed-loop properties, and validate the approach in representative nonlinear and stochastic control benchmarks.
+
+\end{document}
