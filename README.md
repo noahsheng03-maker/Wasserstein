@@ -42,6 +42,8 @@ instead of replacing it with a simplified benchmark.
 
 - `experiments/run_paper_style_experiment.py` now runs the paper-style study
   structure and logs the outputs as CSV/JSON artifacts.
+- `experiments/run_full_scale_studies.sh` runs the four fixed-radius paper-style
+  studies sequentially and then builds summary tables.
 - The current system backend is a hover-like linear surrogate with the same
   input/output dimensions and horizon scales as the paper.
 - A higher-fidelity nonlinear quadcopter backend still needs to be integrated

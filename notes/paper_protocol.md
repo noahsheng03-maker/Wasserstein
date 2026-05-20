@@ -37,6 +37,13 @@ The original paper studies the following axes in its numerical section:
 - `experiments/run_paper_suite.sh`
   Sequential launcher for the four paper-style studies.
 
+- `experiments/run_full_scale_studies.sh`
+  Sequential launcher for the full paper-aligned configuration followed by CSV
+  summary generation.
+
+- `experiments/summarize_paper_results.py`
+  Builds compact summary tables from the raw study CSV outputs.
+
 ## What Is Already Aligned
 
 - Same experiment logic and sweep dimensions as the paper.
