@@ -93,6 +93,34 @@ W(\mathbb{Q},\hat{\mathbb{P}}_N)\le \epsilon
 \end{equation}
 where $\epsilon \ge 0$ is the ambiguity radius and $W(\cdot,\cdot)$ denotes the Wasserstein metric associated with a chosen ground norm.
 
+\subsection{Control Objective}
+The control objective is to regulate the output toward a reference trajectory while preserving input and output safety constraints under distributional uncertainty. Let
+\begin{equation}
+\mathcal{U}:=\{u \in \mathbb{R}^{mT_f}\mid \underline{u}\le u\le \overline{u}\},
+\end{equation}
+\begin{equation}
+\mathcal{Y}:=\{y \in \mathbb{R}^{pT_f}\mid \underline{y}\le y\le \overline{y}\},
+\end{equation}
+denote the admissible input and output sets over the prediction horizon. For a reference output sequence $y^{\mathrm{ref}}$, we consider a quadratic tracking-and-effort objective of the form
+\begin{equation}
+\ell(u,y)
+:=
+\|y-y^{\mathrm{ref}}\|_{Q}^{2}
+\|u-u^{\mathrm{ref}}\|_{R}^{2},
+\end{equation}
+where $Q\succeq 0$ and $R\succ 0$ are weighting matrices and $u^{\mathrm{ref}}$ denotes a nominal input around the hovering or equilibrium operating condition.
+
+The design goal addressed in this paper can be summarized as follows: choose an ambiguity-radius sequence $\{\epsilon_t\}_{t\ge0}$ so that the resulting closed-loop controller preserves the convex tractability and safety-aware structure of DR-DeePC while improving the closed-loop performance-risk trade-off under nonstationary uncertainty.
+
+\begin{assumption}
+\label{ass:compact}
+The sets $\mathcal{U}$ and $\mathcal{Y}$ are nonempty, compact, and convex, and the reference signals remain bounded.
+\end{assumption}
+
+\begin{remark}
+Assumption~\ref{ass:compact} is standard in constrained predictive control and ensures that the stage cost and constraint functions are evaluated on compact domains. In the present study, the box constraints used in the numerical section satisfy this assumption directly.
+\end{remark}
+
 \subsection{Inner DR-DeePC Problem}
 At time $t$, given the most recent input-output window $(u_{\mathrm{ini},t},y_{\mathrm{ini},t})$ and a fixed ambiguity radius $\epsilon_t$, the inner control problem is written abstractly as
 \begin{subequations}
@@ -124,7 +152,7 @@ Here $\ell(u,y)$ denotes the finite-horizon stage cost, $\sigma$ is the output-c
 
 \begin{assumption}
 \label{ass:lipschitz}
-The stage cost $\ell(u,y)$ and the constraint function $h(y)$ are convex and Lipschitz on the compact sets of interest, and the tractable Wasserstein DR-DeePC reformulation of \eqref{eq:drdeepc-abstract} is feasible for all $\epsilon \in [\epsilon_{\min},\epsilon_{\max}]$ considered by the adaptive law.
+Under Assumption~\ref{ass:compact}, the stage cost $\ell(u,y)$ and the constraint function $h(y)$ are convex and Lipschitz on the compact sets of interest, and the tractable Wasserstein DR-DeePC reformulation of \eqref{eq:drdeepc-abstract} is feasible for all $\epsilon \in [\epsilon_{\min},\epsilon_{\max}]$ considered by the adaptive law.
 \end{assumption}
 
 \begin{remark}
