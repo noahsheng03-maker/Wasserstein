@@ -3,6 +3,7 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath,amssymb,amsfonts}
+\usepackage{amsthm}
 \usepackage{bm}
 \usepackage{mathtools}
 \usepackage{cite}
@@ -16,6 +17,11 @@
   citecolor=black,
   urlcolor=blue
 }
+
+\newtheorem{assumption}{Assumption}
+\newtheorem{lemma}{Lemma}
+\newtheorem{proposition}{Proposition}
+\newtheorem{remark}{Remark}
 
 \title{Adaptive Wasserstein Radius Selection for Distributionally Robust Data-Enabled Predictive Control}
 
@@ -54,15 +60,76 @@ The contributions of the proposed study are summarized as follows.
     \item We provide a structured experimental plan to evaluate fixed-radius and adaptive-radius DR-DeePC under stationary and nonstationary uncertainty scenarios.
 \end{enumerate}
 
-The remainder of this draft is organized as follows. Section~\ref{sec:method} presents the method framework, including the problem setup, the offline initialization procedure, the online adaptation law, and the safeguarded update mechanism.
+The remainder of this draft is organized as follows. Section~\ref{sec:method} presents the formal problem setup, the adaptive radius mechanism, and several basic analytical properties of the resulting controller. Section~\ref{sec:experiments} summarizes the current experimental protocol and the main observations obtained so far.
 
 \section{Method Framework}
 \label{sec:method}
 
-\subsection{Problem Setup}
-We consider an unknown stochastic dynamical system controlled through a receding-horizon data-enabled predictive controller. Offline, repeated input-output experiments are performed to construct the DeePC data matrices and the empirical distribution associated with the noisy output trajectories. Online, at each time step, the controller observes the most recent input-output window and solves a Wasserstein distributionally robust DeePC problem over a finite horizon.
+\subsection{Formal Setup}
+Consider an unknown discrete-time stochastic system
+\begin{equation}
+x_{t+1} = f(x_t,u_t,w_t), \qquad y_t = h(x_t) + v_t,
+\end{equation}
+where $u_t \in \mathbb{R}^{m}$ is the input, $y_t \in \mathbb{R}^{p}$ is the measured output, and $w_t,v_t$ are process and measurement disturbances. The controller does not assume explicit knowledge of $f$ and instead relies on offline input-output data collected from repeated experiments.
 
-Let $\epsilon_t$ denote the Wasserstein ambiguity radius used at time step $t$. For a fixed $\epsilon_t$, the inner-layer optimization takes the form of a standard distributionally robust DeePC problem in which the nominal sample-average objective is augmented by a robustness-induced regularization term and the safety constraints are enforced through a distributionally robust CVaR approximation. The detailed tractable reformulation follows the standard DR-DeePC derivation and is not modified in the inner layer. The novelty lies in how $\epsilon_t$ is initialized and updated.
+Let $u^{(i)}_{0:T-1}$ and $y^{(i)}_{0:T-1}$ denote the $i$th offline trajectory, $i \in \{1,\dots,N\}$. For a chosen initialization length $T_{\mathrm{ini}}$ and prediction horizon $T_f$, these trajectories are arranged into DeePC data matrices
+\begin{equation}
+U_p,\; Y_p,\; U_f,\; Y_f,
+\end{equation}
+where the past blocks $(U_p,Y_p)$ encode the initialization window and the future blocks $(U_f,Y_f)$ encode prediction trajectories. In the standard DeePC parametrization, a candidate future trajectory is represented by a coefficient vector $g$ satisfying
+\begin{equation}
+u_{\mathrm{ini}} = U_p g,\qquad y_{\mathrm{ini}} \approx Y_p g,\qquad
+u = U_f g,\qquad y = Y_f g.
+\end{equation}
+
+The distributionally robust extension replaces a single empirical disturbance law by an ambiguity set. Let $\hat{\mathbb{P}}_N$ be the empirical distribution induced by the repeated offline data and define the Wasserstein ambiguity set
+\begin{equation}
+\mathcal{P}_{\epsilon}
+:=
+\left\{
+\mathbb{Q}\; \middle| \;
+W(\mathbb{Q},\hat{\mathbb{P}}_N)\le \epsilon
+\right\},
+\end{equation}
+where $\epsilon \ge 0$ is the ambiguity radius and $W(\cdot,\cdot)$ denotes the Wasserstein metric associated with a chosen ground norm.
+
+\subsection{Inner DR-DeePC Problem}
+At time $t$, given the most recent input-output window $(u_{\mathrm{ini},t},y_{\mathrm{ini},t})$ and a fixed ambiguity radius $\epsilon_t$, the inner control problem is written abstractly as
+\begin{subequations}
+\label{eq:drdeepc-abstract}
+\begin{align}
+J_t^\star(\epsilon_t)
+:=
+\min_{g,u,y,\sigma}\quad
+& \sup_{\mathbb{Q}\in\mathcal{P}_{\epsilon_t}}
+\mathbb{E}_{\mathbb{Q}} \big[ \ell(u,y) \big]
+ + \lambda_{\sigma}\|\sigma\|_1
+\label{eq:drdeepc-abstract-cost}
+\\
+\text{s.t.}\quad
+& u_{\mathrm{ini},t} = U_p g,
+\\
+& y_{\mathrm{ini},t} = Y_p g + \sigma,
+\\
+& u = U_f g,\qquad y = Y_f g,
+\\
+& u \in \mathcal{U}, 
+\\
+& \sup_{\mathbb{Q}\in\mathcal{P}_{\epsilon_t}}
+\mathrm{CVaR}_{\alpha}^{\mathbb{Q}}\!\big(h(y)\big) \le 0.
+\label{eq:drdeepc-abstract-risk}
+\end{align}
+\end{subequations}
+Here $\ell(u,y)$ denotes the finite-horizon stage cost, $\sigma$ is the output-consistency slack introduced to accommodate noisy initialization data, and $h(y)\le 0$ represents the output safety constraints. In the tractable Wasserstein DR-DeePC reformulation, the worst-case expectation and worst-case CVaR terms induce regularization and margin terms that remain convex under standard assumptions.
+
+\begin{assumption}
+\label{ass:lipschitz}
+The stage cost $\ell(u,y)$ and the constraint function $h(y)$ are convex and Lipschitz on the compact sets of interest, and the tractable Wasserstein DR-DeePC reformulation of \eqref{eq:drdeepc-abstract} is feasible for all $\epsilon \in [\epsilon_{\min},\epsilon_{\max}]$ considered by the adaptive law.
+\end{assumption}
+
+\begin{remark}
+Assumption~\ref{ass:lipschitz} is standard in Wasserstein distributionally robust optimization. It excludes pathological cases in which the ambiguity radius is varied over regions where the inner DR-DeePC problem loses convexity or feasibility for trivial reasons unrelated to the adaptive mechanism itself.
+\end{remark}
 
 \subsection{Offline Radius Initialization}
 The first step of the proposed framework is to determine an initial ambiguity radius $\epsilon_0$ from data. Instead of relying only on theoretical concentration bounds, we propose to use a data-driven calibration procedure over a candidate set $\mathcal{E}$. Typical choices include logarithmically spaced values such as
@@ -80,7 +147,7 @@ where $J_{\mathrm{track}}$ is the tracking error, $V_{\mathrm{rate}}$ is the emp
 \end{equation}
 This offline step produces a radius that is tuned for the available data and serves as the starting point for the online adaptation law.
 
-\subsection{Online Adaptive Radius Update}
+\subsection{Adaptive Outer-Layer Update}
 A fixed ambiguity radius is unlikely to remain optimal when the uncertainty distribution changes over time. To address this issue, we propose to adapt $\epsilon_t$ online using a small set of closed-loop indicators computed over a recent time window.
 
 The first indicator is the prediction mismatch
@@ -128,6 +195,68 @@ Second, we use asymmetric adaptation gains to react quickly to risk increases an
 where $\Delta_t$ is the aggregated update signal. This prevents oscillatory or overly optimistic radius reduction.
 
 Third, the radius need not be updated at every time step. A slower update clock can be used so that the outer adaptation loop evolves on a longer time scale than the inner control loop. This reduces sensitivity to noise and helps maintain numerical stability.
+
+\subsection{Basic Analytical Properties}
+The purpose of this subsection is not to claim a full closed-loop stability theory yet, but to formalize several structural properties that justify the adaptive mechanism and align the manuscript with a standard control-theoretic presentation.
+
+\begin{lemma}[Radius Projection Invariance]
+\label{lem:invariance}
+Suppose the update law is implemented as
+\begin{equation}
+\epsilon_{t+1}
+=
+\Pi_{[\epsilon_{\min},\epsilon_{\max}]}
+\big(\epsilon_t + \delta_t\big)
+\end{equation}
+for an arbitrary scalar update increment $\delta_t$. If $\epsilon_0 \in [\epsilon_{\min},\epsilon_{\max}]$, then $\epsilon_t \in [\epsilon_{\min},\epsilon_{\max}]$ for all $t \ge 0$.
+\end{lemma}
+
+\begin{proof}
+The claim follows immediately from the definition of the Euclidean projection operator onto the closed interval $[\epsilon_{\min},\epsilon_{\max}]$. If $\epsilon_t$ belongs to this interval, then its projected update also belongs to the same interval. Since $\epsilon_0$ belongs to the interval by construction, induction completes the proof.
+\end{proof}
+
+\begin{proposition}[Boundedness of the Adaptive-Radius Sequence]
+\label{prop:bounded}
+Under Lemma~\ref{lem:invariance}, the adaptive ambiguity-radius sequence is bounded, and every accumulation point of $\{\epsilon_t\}$ belongs to the compact set $[\epsilon_{\min},\epsilon_{\max}]$.
+\end{proposition}
+
+\begin{proof}
+By Lemma~\ref{lem:invariance}, the entire sequence lies in the compact interval $[\epsilon_{\min},\epsilon_{\max}]$. Hence it is bounded and admits convergent subsequences whose limits remain in the same interval.
+\end{proof}
+
+\begin{lemma}[Monotonicity of the Worst-Case Objective]
+\label{lem:objective-monotone}
+Let $J_t^\star(\epsilon)$ denote the optimal value of the inner problem \eqref{eq:drdeepc-abstract} at time $t$ for fixed initialization data. Under Assumption~\ref{ass:lipschitz}, if $0 \le \epsilon_1 \le \epsilon_2$, then
+\begin{equation}
+J_t^\star(\epsilon_1)\le J_t^\star(\epsilon_2).
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+If $\epsilon_1 \le \epsilon_2$, then $\mathcal{P}_{\epsilon_1}\subseteq \mathcal{P}_{\epsilon_2}$. Therefore, for every feasible decision tuple $(g,u,y,\sigma)$, the worst-case expectation over $\mathcal{P}_{\epsilon_1}$ is upper-bounded by the corresponding worst-case expectation over $\mathcal{P}_{\epsilon_2}$. The same inclusion argument applies to the worst-case CVaR constraint. Minimizing over the same feasible decision variables preserves the inequality for the optimal value.
+\end{proof}
+
+\begin{proposition}[Tractability Preservation Under Radius Adaptation]
+\label{prop:tractability}
+Under Assumption~\ref{ass:lipschitz}, if the inner Wasserstein DR-DeePC problem admits a convex tractable reformulation for every fixed $\epsilon \in [\epsilon_{\min},\epsilon_{\max}]$, then the adaptive-radius controller preserves this tractability at every time step.
+\end{proposition}
+
+\begin{proof}
+The outer layer updates only the scalar parameter $\epsilon_t$ and does not alter the decision variables, the convex stage cost, or the structure of the risk constraints. By Lemma~\ref{lem:invariance}, the updated radius always remains in the admissible interval. Hence each inner problem instance is simply another member of the same convex parametric family, and tractability is preserved.
+\end{proof}
+
+\begin{remark}
+Lemma~\ref{lem:objective-monotone} formalizes the usual robustness-performance trade-off: increasing the ambiguity radius enlarges the adversarial distribution set and therefore cannot improve the optimistic objective value of the inner problem. This observation motivates the adaptive law: larger radii should only be invoked when empirical evidence indicates increased mismatch or risk.
+\end{remark}
+
+\begin{proposition}[Noiseless Reduction to Fixed-Radius DR-DeePC]
+\label{prop:fixed-reduction}
+If the aggregate update signal satisfies $\Delta_t = 0$ for all $t$ and $\epsilon_0 = \bar \epsilon$, then the proposed controller reduces exactly to a fixed-radius DR-DeePC controller with ambiguity radius $\bar \epsilon$.
+\end{proposition}
+
+\begin{proof}
+If $\Delta_t = 0$ for all $t$, then the update law yields $\epsilon_{t+1}=\Pi_{[\epsilon_{\min},\epsilon_{\max}]}(\epsilon_t)$. Since $\epsilon_t$ already belongs to the admissible interval, the projection acts as the identity map and $\epsilon_{t+1}=\epsilon_t$ for all $t$. With $\epsilon_0=\bar \epsilon$, the sequence remains constant and the inner problem solved at each time coincides with the fixed-radius DR-DeePC controller of radius $\bar\epsilon$.
+\end{proof}
 
 \subsection{Expected Properties and Evaluation}
 The proposed framework is designed to preserve the tractable structure of DR-DeePC because only the ambiguity radius is updated between optimization steps, while the inner problem formulation remains unchanged. The expected benefits are as follows.
