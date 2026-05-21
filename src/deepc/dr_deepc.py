@@ -100,12 +100,20 @@ class WassersteinDRDeePC:
         )
         self.problem = cp.Problem(cp.Minimize(self.objective_expr), constraints)
 
-    def solve(self, u_ini: np.ndarray, y_ini: np.ndarray, epsilon: float, solver: str = "CLARABEL") -> DRDeePCResult:
+    def solve(
+        self,
+        u_ini: np.ndarray,
+        y_ini: np.ndarray,
+        epsilon: float,
+        solver: str = "CLARABEL",
+        solver_options: dict | None = None,
+    ) -> DRDeePCResult:
         self.u_ini_param.value = np.asarray(u_ini).reshape(-1)
         self.y_ini_param.value = np.asarray(y_ini).reshape(-1)
         self.epsilon_param.value = float(epsilon)
+        solver_options = {} if solver_options is None else dict(solver_options)
         try:
-            self.problem.solve(solver=solver, verbose=False, warm_start=True)
+            self.problem.solve(solver=solver, verbose=False, warm_start=True, **solver_options)
         except cp.SolverError:
             self.problem.solve(solver="SCS", verbose=False, warm_start=True)
 

@@ -21,6 +21,35 @@ from src.deepc.systems import LinearHoverSystem
 from src.utils.config import load_yaml
 
 
+def structural_config_key(config: dict) -> tuple:
+    return (
+        config["seed"],
+        config["system"]["dt"],
+        config["system"]["process_noise_std"],
+        config["system"]["measurement_noise_std"],
+        config["offline_data"]["N"],
+        config["offline_data"]["horizon"],
+        config["offline_data"]["input_std"],
+        config["offline_data"].get("repeated_input", True),
+        config["controller"]["T_ini"],
+        config["controller"]["T_f"],
+        config["controller"]["matrix_type"],
+        config["controller"]["alpha"],
+        tuple(config["constraints"]["input_lower"]),
+        tuple(config["constraints"]["input_upper"]),
+        tuple(config["constraints"]["output_lower"]),
+        tuple(config["constraints"]["output_upper"]),
+        tuple(config["objective"]["y_ref"]),
+        config["objective"]["hover_thrust"],
+        config["objective"]["thrust_weight"],
+        config["objective"]["rate_weight"],
+        config["objective"]["output_weight"],
+        config["objective"]["past_weight"],
+        config["objective"]["l_obj"],
+        config["objective"]["l_con"],
+    )
+
+
 def sample_input_sequence(config: dict, system: LinearHoverSystem, horizon: int, rng: np.random.Generator) -> np.ndarray:
     objective = config["objective"]
     constraints = config["constraints"]
@@ -108,12 +137,36 @@ def build_controller(config: dict, up, uf, yp_batches, yf_batches):
     )
 
 
-def evaluate_closed_loop(config: dict, mode: str = "fixed", fixed_epsilon: float | None = None):
+def build_bundle(config: dict) -> dict:
     system, up, uf, yp_batches, yf_batches, raw_batches = build_offline_batches(config)
     controller = build_controller(config, up, uf, yp_batches, yf_batches)
+    return {
+        "system": system,
+        "controller": controller,
+        "up": up,
+        "uf": uf,
+        "yp_batches": yp_batches,
+        "yf_batches": yf_batches,
+        "raw_batches": raw_batches,
+    }
+
+
+def evaluate_closed_loop(
+    config: dict,
+    mode: str = "fixed",
+    fixed_epsilon: float | None = None,
+    bundle: dict | None = None,
+):
+    bundle = build_bundle(config) if bundle is None else bundle
+    system = bundle["system"]
+    controller = bundle["controller"]
+    up = bundle["up"]
+    raw_batches = bundle["raw_batches"]
     t_ini = config["controller"]["T_ini"]
     horizon_sim = config["controller"]["horizon_sim"]
     control_horizon = config["controller"]["control_horizon"]
+    solver_name = config["controller"].get("solver_name", "CLARABEL")
+    solver_options = config["controller"].get("solver_options", {})
 
     u_hist = []
     y_hist = []
@@ -149,7 +202,13 @@ def evaluate_closed_loop(config: dict, mode: str = "fixed", fixed_epsilon: float
     for t in range(horizon_sim):
         u_ini = np.asarray(u_hist[-t_ini:]).T.reshape(-1, order="F")
         y_ini = np.asarray(y_hist[-t_ini:]).T.reshape(-1, order="F")
-        result = controller.solve(u_ini=u_ini, y_ini=y_ini, epsilon=epsilon)
+        result = controller.solve(
+            u_ini=u_ini,
+            y_ini=y_ini,
+            epsilon=epsilon,
+            solver=solver_name,
+            solver_options=solver_options,
+        )
         u_star = result.u_future.reshape(system.input_dim, -1, order="F")
         u_apply = u_star[:, 0]
         xs, ys = system.rollout(u_apply.reshape(system.input_dim, 1), x0=x, rng=rng)
@@ -212,15 +271,18 @@ def save_partial_frame(out_dir: Path, file_name: str, records: list[dict]) -> No
 def run_nominal_comparison(config: dict, out_dir: Path | None = None) -> tuple[pd.DataFrame, dict]:
     records = []
     study_start = time.time()
-    print("[nominal] running adaptive controller")
-    adaptive = evaluate_closed_loop(config, mode="adaptive")
-    if out_dir is not None:
-        with (out_dir / "adaptive_trace.json").open("w", encoding="utf-8") as handle:
-            json.dump(adaptive, handle, indent=2)
+    bundle = build_bundle(config)
+    adaptive = {}
+    if config.get("evaluation", {}).get("run_adaptive", True):
+        print("[nominal] running adaptive controller")
+        adaptive = evaluate_closed_loop(config, mode="adaptive", bundle=bundle)
+        if out_dir is not None:
+            with (out_dir / "adaptive_trace.json").open("w", encoding="utf-8") as handle:
+                json.dump(adaptive, handle, indent=2)
     for epsilon in config["evaluation"]["epsilon_grid"]:
         epsilon_start = time.time()
         print(f"[nominal] running fixed epsilon={epsilon}")
-        res = evaluate_closed_loop(config, mode="fixed", fixed_epsilon=epsilon)
+        res = evaluate_closed_loop(config, mode="fixed", fixed_epsilon=epsilon, bundle=bundle)
         records.append(
             {
                 "study": "nominal_comparison",
@@ -240,22 +302,23 @@ def run_nominal_comparison(config: dict, out_dir: Path | None = None) -> tuple[p
         print(f"[nominal] finished epsilon={epsilon} in {time.time() - epsilon_start:.1f}s")
         if out_dir is not None:
             save_partial_frame(out_dir, "paper_style_nominal_comparison.csv", records)
-    records.append(
-        {
-            "study": "nominal_comparison",
-            "controller_mode": "adaptive",
-            "epsilon_setting": adaptive["epsilon_initial"],
-            "tracking_error": adaptive["tracking_error"],
-            "violation_rate": adaptive["violation_rate"],
-            "tail_violation_score": adaptive["tail_violation_score"],
-            "epsilon_final": adaptive["epsilon_final"],
-            "offline_columns": adaptive["offline_columns"],
-            "offline_batches": adaptive["offline_batches"],
-            "offline_horizon": adaptive["offline_horizon"],
-            "matrix_type": adaptive["matrix_type"],
-            "t_ini": adaptive["t_ini"],
-        }
-    )
+    if adaptive:
+        records.append(
+            {
+                "study": "nominal_comparison",
+                "controller_mode": "adaptive",
+                "epsilon_setting": adaptive["epsilon_initial"],
+                "tracking_error": adaptive["tracking_error"],
+                "violation_rate": adaptive["violation_rate"],
+                "tail_violation_score": adaptive["tail_violation_score"],
+                "epsilon_final": adaptive["epsilon_final"],
+                "offline_columns": adaptive["offline_columns"],
+                "offline_batches": adaptive["offline_batches"],
+                "offline_horizon": adaptive["offline_horizon"],
+                "matrix_type": adaptive["matrix_type"],
+                "t_ini": adaptive["t_ini"],
+            }
+        )
     if out_dir is not None:
         save_partial_frame(out_dir, "paper_style_nominal_comparison.csv", records)
     print(f"[nominal] complete in {time.time() - study_start:.1f}s")
@@ -268,10 +331,11 @@ def run_epsilon_sweep(config: dict, out_dir: Path | None = None) -> pd.DataFrame
     for n_batches in config["evaluation"]["N_grid"]:
         local_config = clone_config(config)
         local_config["offline_data"]["N"] = int(n_batches)
+        bundle = build_bundle(local_config)
         for epsilon in config["evaluation"]["epsilon_grid"]:
             case_start = time.time()
             print(f"[epsilon] running N={n_batches}, epsilon={epsilon}")
-            res = evaluate_closed_loop(local_config, mode="fixed", fixed_epsilon=epsilon)
+            res = evaluate_closed_loop(local_config, mode="fixed", fixed_epsilon=epsilon, bundle=bundle)
             records.append(
                 {
                     "study": "epsilon_sweep",
@@ -300,9 +364,15 @@ def run_horizon_and_matrix_sweep(config: dict, out_dir: Path | None = None) -> p
             local_config = clone_config(config)
             local_config["controller"]["matrix_type"] = matrix_type
             local_config["offline_data"]["horizon"] = int(horizon)
+            bundle = build_bundle(local_config)
             case_start = time.time()
             print(f"[horizon-matrix] running matrix_type={matrix_type}, horizon={horizon}")
-            res = evaluate_closed_loop(local_config, mode="fixed", fixed_epsilon=config["controller"]["epsilon_nominal"])
+            res = evaluate_closed_loop(
+                local_config,
+                mode="fixed",
+                fixed_epsilon=config["controller"]["epsilon_nominal"],
+                bundle=bundle,
+            )
             records.append(
                 {
                     "study": "horizon_matrix_sweep",
@@ -330,9 +400,15 @@ def run_tini_sweep(config: dict, out_dir: Path | None = None) -> pd.DataFrame:
     for t_ini in config["evaluation"]["T_ini_grid"]:
         local_config = clone_config(config)
         local_config["controller"]["T_ini"] = int(t_ini)
+        bundle = build_bundle(local_config)
         case_start = time.time()
         print(f"[tini] running T_ini={t_ini}")
-        res = evaluate_closed_loop(local_config, mode="fixed", fixed_epsilon=config["controller"]["epsilon_nominal"])
+        res = evaluate_closed_loop(
+            local_config,
+            mode="fixed",
+            fixed_epsilon=config["controller"]["epsilon_nominal"],
+            bundle=bundle,
+        )
         records.append(
             {
                 "study": "tini_sweep",
@@ -372,6 +448,17 @@ def parse_args() -> argparse.Namespace:
         default="all",
         help="Select which paper-style study to run.",
     )
+    parser.add_argument(
+        "--skip-adaptive",
+        action="store_true",
+        help="Skip the adaptive controller run inside the nominal study.",
+    )
+    parser.add_argument(
+        "--epsilon-index",
+        type=int,
+        default=None,
+        help="Run only one epsilon-grid index for the nominal fixed-radius comparison.",
+    )
     return parser.parse_args()
 
 
@@ -384,7 +471,13 @@ def main():
     adaptive_trace: dict = {}
 
     if args.study in {"all", "nominal"}:
-        nominal, adaptive_trace = run_nominal_comparison(config, out_dir=out_dir)
+        nominal_config = clone_config(config)
+        if args.epsilon_index is not None:
+            epsilon_grid = nominal_config["evaluation"]["epsilon_grid"]
+            nominal_config["evaluation"]["epsilon_grid"] = [epsilon_grid[int(args.epsilon_index)]]
+        if args.skip_adaptive:
+            nominal_config["evaluation"]["run_adaptive"] = False
+        nominal, adaptive_trace = run_nominal_comparison(nominal_config, out_dir=out_dir)
         frames["paper_style_nominal_comparison"] = nominal
     if args.study in {"all", "epsilon"}:
         frames["paper_style_epsilon_sweep"] = run_epsilon_sweep(config, out_dir=out_dir)

@@ -16,6 +16,10 @@ controller:
   alpha: 0.1
   matrix_type: page
   epsilon_nominal: 0.003
+  solver_name: SCS
+  solver_options:
+    max_iters: 2000
+    eps: 0.001
 constraints:
   input_lower: [0.1597, -1.57079632679, -1.57079632679]
   input_upper: [0.4791, 1.57079632679, 1.57079632679]

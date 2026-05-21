@@ -7,7 +7,8 @@ under `experiments/paper_base.yaml`.
 
 - `nominal`
   - status: running
-  - note: launched after the full-scale launcher and summary infrastructure was finalized.
+  - note: solver profile updated to `SCS_fast` on 2026-05-21 after profiling.
+  - current stage: profiling-based restart path for adaptive and per-epsilon resumable runs
 
 - `epsilon`
   - status: pending
