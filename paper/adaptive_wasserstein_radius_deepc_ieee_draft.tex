@@ -140,6 +140,29 @@ The proposed framework is designed to preserve the tractable structure of DR-Dee
 
 To evaluate the method, we will compare the proposed adaptive-radius DR-DeePC against three baselines: a theoretically sized fixed radius, a manually tuned fixed radius, and a cross-validated fixed radius. Closed-loop experiments should include nominal scenarios, variance shifts, abrupt disturbance changes, and drifting noise statistics. The main evaluation metrics will be tracking error, empirical violation rate, CVaR-like tail violation score, computational time, and the trajectory of the adaptive radius itself.
 
+\section{Experimental Setup and Current Results}
+\label{sec:experiments}
+
+\subsection{Paper-Style Evaluation Setup}
+Our current evaluation protocol follows the structure of the reference DR-DeePC study as closely as possible within the present software stack. The controller is tested in a receding-horizon setting with prediction horizon $T_f = 25$, initialization window $T_{\mathrm{ini}} = 6$, simulation length $250$ steps, and repeated offline experiments of length $15500$. Unless otherwise stated, the Page matrix representation is used with $N=10$ offline batches, output box constraints $[-0.6,1.6]^3$, and Wasserstein nominal radius $\epsilon=0.003$. The inner DR-DeePC problem is solved using an SCS-based conic formulation with warm-started repeated solves.
+
+The current implementation already supports the same core sensitivity studies that motivate the proposed adaptive-radius extension: nominal radius sweeps, batch-count comparisons, horizon/matrix comparisons, and $T_{\mathrm{ini}}$ sweeps. These studies are important because they quantify how sensitive Wasserstein DR-DeePC is to fixed radius selection and how strongly the behavior depends on data richness and trajectory embedding choices.
+
+\subsection{Fixed-Radius Baseline Observations}
+The full-scale nominal radius sweep already shows a clear performance-safety trade-off. For example, a very small fixed radius $\epsilon=10^{-4}$ yields tracking error $127.31$ but a high violation rate of $0.784$, whereas a more conservative fixed radius $\epsilon=0.02$ reduces the violation rate to $0.396$ and yields tracking error $118.20$. These preliminary results confirm the practical importance of radius selection and support the claim that a single fixed ambiguity radius may be inadequate across operating regimes.
+
+The batch-count study also indicates that repeated offline experiments matter. In the nominal comparison, the adaptive controller with $N=10$ achieves tracking error $120.36$ and violation rate $0.324$, whereas the analogous $N=1$ adaptive setting yields tracking error $147.87$ and violation rate $0.572$. This is consistent with the intuition that richer repeated data improve the reliability of the empirical distribution and reduce sensitivity to ambiguity-set misspecification.
+
+The $T_{\mathrm{ini}}$ sweep has now been completed for $T_{\mathrm{ini}} \in \{1,\dots,10\}$ and reveals a strongly non-monotone dependence on the initialization window. Some settings, such as $T_{\mathrm{ini}}=5$ and $T_{\mathrm{ini}}=8$, produce zero empirical violations in the current benchmark, whereas other settings produce both large tracking errors and large tail-risk scores. This reinforces the need to separate radius adaptation effects from data-window design effects when interpreting closed-loop performance.
+
+\subsection{Preliminary Adaptive-Radius Results}
+The adaptive-radius study has already produced a first full-scale nonstationary comparison under a noise-jump scenario. In this case, the adaptive controller achieves tracking error $144.48$, violation rate $0.400$, and tail violation score $0.2387$, while the aggressive fixed-radius baseline with $\epsilon=10^{-4}$ yields tracking error $161.46$, violation rate $0.784$, and tail violation score $0.3882$. Even at this early stage, the adaptive policy shows a more favorable performance-safety trade-off under changing uncertainty statistics.
+
+These preliminary results do not yet constitute the final experimental section, but they already validate the main research direction. First, fixed-radius DR-DeePC exhibits substantial sensitivity to ambiguity-radius choice. Second, repeated data batches and initialization-window design materially affect robustness outcomes. Third, the proposed adaptive-radius mechanism appears capable of reducing violation frequency and tail-risk severity in a nonstationary scenario without altering the inner DR-DeePC formulation.
+
+\subsection{Computational Note on Large Hankel Instances}
+One difficult case remains the full-scale Hankel representation with offline horizon $15407$. In the current implementation, this case is solvable for a one-step full-scale closed-loop evaluation, but the computational burden is extremely high, on the order of several hundred seconds per step. We therefore treat this setting as a computational stress case rather than a blocking dependency for the adaptive-radius study. This observation is itself informative, since it highlights a practical scalability limitation of large Hankel embeddings in distributionally robust DeePC.
+
 \section{Concluding Remark for the Draft}
 This draft outlines a practical and research-relevant extension of Wasserstein distributionally robust DeePC. The proposed direction does not alter the inner DeePC structure; instead, it equips the controller with an adaptive mechanism for selecting the ambiguity radius based on observed closed-loop behavior. This makes the resulting controller more suitable for real operating environments where uncertainty statistics are not stationary. The next stage of the work will formalize the adaptation law, analyze its closed-loop properties, and validate the approach in representative nonlinear and stochastic control benchmarks.
 

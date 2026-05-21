@@ -52,6 +52,7 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     records = []
+    output_path = out_dir / "adaptive_scenario_comparison.csv"
     scenario_names = config["adaptive_compare"]["scenarios"]
     if args.scenario is not None:
         scenario_names = [args.scenario]
@@ -65,6 +66,7 @@ def main() -> None:
         bundle = build_bundle(scenario_cfg)
 
         if not args.skip_adaptive:
+            print(f"[adaptive-compare] running scenario={scenario_name} mode=adaptive")
             adaptive = evaluate_closed_loop(scenario_cfg, mode="adaptive", bundle=bundle)
             records.append(
                 {
@@ -80,6 +82,7 @@ def main() -> None:
             )
 
         for epsilon in fixed_epsilons:
+            print(f"[adaptive-compare] running scenario={scenario_name} mode=fixed epsilon={epsilon}")
             fixed = evaluate_closed_loop(scenario_cfg, mode="fixed", fixed_epsilon=epsilon, bundle=bundle)
             records.append(
                 {
@@ -94,8 +97,16 @@ def main() -> None:
                 }
             )
 
-    frame = pd.DataFrame(records)
-    frame.to_csv(out_dir / "adaptive_scenario_comparison.csv", index=False)
+    new_frame = pd.DataFrame(records)
+    if output_path.exists():
+        old_frame = pd.read_csv(output_path)
+        frame = pd.concat([old_frame, new_frame], ignore_index=True)
+        frame = frame.drop_duplicates(subset=["scenario", "controller_mode"], keep="last")
+        frame = frame.sort_values(["scenario", "controller_mode"]).reset_index(drop=True)
+    else:
+        frame = new_frame
+
+    frame.to_csv(output_path, index=False)
     print(frame.to_string(index=False))
 
 
