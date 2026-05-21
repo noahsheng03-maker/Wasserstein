@@ -268,6 +268,20 @@ def save_partial_frame(out_dir: Path, file_name: str, records: list[dict]) -> No
     pd.DataFrame(records).to_csv(out_dir / file_name, index=False)
 
 
+def merge_records_with_existing(out_dir: Path, file_name: str, records: list[dict], key_columns: list[str]) -> pd.DataFrame:
+    out_dir.mkdir(exist_ok=True)
+    new_frame = pd.DataFrame(records)
+    target = out_dir / file_name
+    if target.exists():
+        existing = pd.read_csv(target)
+        merged = pd.concat([existing, new_frame], ignore_index=True)
+    else:
+        merged = new_frame
+    merged = merged.drop_duplicates(subset=key_columns, keep="last")
+    merged.to_csv(target, index=False)
+    return merged
+
+
 def run_nominal_comparison(config: dict, out_dir: Path | None = None) -> tuple[pd.DataFrame, dict]:
     records = []
     study_start = time.time()
@@ -301,7 +315,12 @@ def run_nominal_comparison(config: dict, out_dir: Path | None = None) -> tuple[p
         )
         print(f"[nominal] finished epsilon={epsilon} in {time.time() - epsilon_start:.1f}s")
         if out_dir is not None:
-            save_partial_frame(out_dir, "paper_style_nominal_comparison.csv", records)
+            merge_records_with_existing(
+                out_dir,
+                "paper_style_nominal_comparison.csv",
+                records,
+                key_columns=["controller_mode", "offline_batches", "offline_horizon", "matrix_type", "t_ini"],
+            )
     if adaptive:
         records.append(
             {
@@ -320,7 +339,12 @@ def run_nominal_comparison(config: dict, out_dir: Path | None = None) -> tuple[p
             }
         )
     if out_dir is not None:
-        save_partial_frame(out_dir, "paper_style_nominal_comparison.csv", records)
+        merge_records_with_existing(
+            out_dir,
+            "paper_style_nominal_comparison.csv",
+            records,
+            key_columns=["controller_mode", "offline_batches", "offline_horizon", "matrix_type", "t_ini"],
+        )
     print(f"[nominal] complete in {time.time() - study_start:.1f}s")
     return pd.DataFrame(records), adaptive
 
@@ -454,10 +478,39 @@ def parse_args() -> argparse.Namespace:
         help="Skip the adaptive controller run inside the nominal study.",
     )
     parser.add_argument(
+        "--output-dir",
+        default=str(REPO_ROOT / "outputs"),
+        help="Directory for CSV/JSON outputs.",
+    )
+    parser.add_argument(
         "--epsilon-index",
         type=int,
         default=None,
         help="Run only one epsilon-grid index for the nominal fixed-radius comparison.",
+    )
+    parser.add_argument(
+        "--override-n-batches",
+        type=int,
+        default=None,
+        help="Override offline_data.N for single-case execution.",
+    )
+    parser.add_argument(
+        "--override-horizon",
+        type=int,
+        default=None,
+        help="Override offline_data.horizon for single-case execution.",
+    )
+    parser.add_argument(
+        "--override-matrix-type",
+        choices=["page", "hankel"],
+        default=None,
+        help="Override controller.matrix_type for single-case execution.",
+    )
+    parser.add_argument(
+        "--override-tini",
+        type=int,
+        default=None,
+        help="Override controller.T_ini for single-case execution.",
     )
     return parser.parse_args()
 
@@ -465,7 +518,16 @@ def parse_args() -> argparse.Namespace:
 def main():
     args = parse_args()
     config = load_yaml(Path(args.config))
-    out_dir = REPO_ROOT / "outputs"
+    out_dir = Path(args.output_dir)
+
+    if args.override_n_batches is not None:
+        config["offline_data"]["N"] = int(args.override_n_batches)
+    if args.override_horizon is not None:
+        config["offline_data"]["horizon"] = int(args.override_horizon)
+    if args.override_matrix_type is not None:
+        config["controller"]["matrix_type"] = str(args.override_matrix_type)
+    if args.override_tini is not None:
+        config["controller"]["T_ini"] = int(args.override_tini)
 
     frames: dict[str, pd.DataFrame] = {}
     adaptive_trace: dict = {}

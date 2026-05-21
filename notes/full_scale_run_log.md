@@ -6,9 +6,9 @@ under `experiments/paper_base.yaml`.
 ## Studies
 
 - `nominal`
-  - status: running
+  - status: nominal epsilon sweep completed
   - note: solver profile updated to `SCS_fast` on 2026-05-21 after profiling.
-  - current stage: profiling-based restart path for adaptive and per-epsilon resumable runs
+  - current stage: full-scale adaptive and fixed-radius nominal points completed for the epsilon grid tracked in `outputs/full_scale/paper_style_nominal_comparison_full.csv`
 
 - `epsilon`
   - status: pending
