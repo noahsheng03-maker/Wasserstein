@@ -21,6 +21,43 @@ from src.deepc.systems import LinearHoverSystem
 from src.utils.config import load_yaml
 
 
+def scenario_step_parameters(config: dict, step_idx: int) -> dict:
+    scenario = config.get("scenario", {"type": "nominal"})
+    scenario_type = scenario.get("type", "nominal")
+    process_std = float(config["system"]["process_noise_std"])
+    measurement_std = float(config["system"]["measurement_noise_std"])
+    output_bias = np.zeros(3)
+
+    if scenario_type == "noise_jump":
+        jump_step = int(scenario.get("jump_step", 100))
+        noise_multiplier = float(scenario.get("noise_multiplier", 4.0))
+        if step_idx >= jump_step:
+            process_std *= noise_multiplier
+            measurement_std *= noise_multiplier
+    elif scenario_type == "recovery":
+        jump_step = int(scenario.get("jump_step", 100))
+        recover_step = int(scenario.get("recover_step", 180))
+        noise_multiplier = float(scenario.get("noise_multiplier", 4.0))
+        if jump_step <= step_idx < recover_step:
+            process_std *= noise_multiplier
+            measurement_std *= noise_multiplier
+    elif scenario_type == "bias_shift":
+        shift_step = int(scenario.get("shift_step", 100))
+        bias_vector = np.asarray(scenario.get("bias_vector", [0.1, 0.0, 0.0]), dtype=float)
+        if step_idx >= shift_step:
+            output_bias = bias_vector
+    elif scenario_type == "nominal":
+        pass
+    else:
+        raise ValueError(f"Unsupported scenario type: {scenario_type}")
+
+    return {
+        "process_noise_std": process_std,
+        "measurement_noise_std": measurement_std,
+        "output_bias": output_bias,
+    }
+
+
 def structural_config_key(config: dict) -> tuple:
     return (
         config["seed"],
@@ -211,9 +248,16 @@ def evaluate_closed_loop(
         )
         u_star = result.u_future.reshape(system.input_dim, -1, order="F")
         u_apply = u_star[:, 0]
-        xs, ys = system.rollout(u_apply.reshape(system.input_dim, 1), x0=x, rng=rng)
+        step_params = scenario_step_parameters(config, t)
+        xs, ys = system.rollout(
+            u_apply.reshape(system.input_dim, 1),
+            x0=x,
+            rng=rng,
+            process_noise_std=step_params["process_noise_std"],
+            measurement_noise_std=step_params["measurement_noise_std"],
+        )
         x = xs[:, -1]
-        y_next = ys[:, -1]
+        y_next = ys[:, -1] + step_params["output_bias"]
         y_pred_first = result.y_future_samples[0].reshape(system.output_dim, -1, order="F")[:, 0]
 
         prediction_error = float(np.linalg.norm(y_next - y_pred_first))
@@ -239,6 +283,7 @@ def evaluate_closed_loop(
     violation_magnitudes = np.maximum(np.maximum(y_array - out_upper, out_lower - y_array), 0.0)
     tail_score = float(np.mean(np.sort(np.max(violation_magnitudes, axis=1))[-max(1, len(y_array)//10):]))
     return {
+        "status": "optimal",
         "mode": mode,
         "epsilon_initial": epsilon_trace[0],
         "epsilon_final": epsilon_trace[-1],
@@ -257,6 +302,39 @@ def evaluate_closed_loop(
         "t_f": int(config["controller"]["T_f"]),
         "raw_batches_shapes": [(u.shape, y.shape) for u, y in raw_batches],
     }
+
+
+def safe_evaluate_closed_loop(
+    config: dict,
+    mode: str = "fixed",
+    fixed_epsilon: float | None = None,
+    bundle: dict | None = None,
+) -> dict:
+    try:
+        return evaluate_closed_loop(config, mode=mode, fixed_epsilon=fixed_epsilon, bundle=bundle)
+    except RuntimeError as exc:
+        bundle = build_bundle(config) if bundle is None else bundle
+        up = bundle["up"]
+        return {
+            "status": f"failed: {exc}",
+            "mode": mode,
+            "epsilon_initial": fixed_epsilon if fixed_epsilon is not None else config["controller"]["epsilon_nominal"],
+            "epsilon_final": fixed_epsilon if fixed_epsilon is not None else config["controller"]["epsilon_nominal"],
+            "tracking_error": float("nan"),
+            "violation_rate": float("nan"),
+            "tail_violation_score": float("nan"),
+            "epsilon_trace": [],
+            "prediction_error_trace": [],
+            "stress_trace": [],
+            "shift_trace": [],
+            "offline_columns": int(up.shape[1]),
+            "offline_horizon": int(config["offline_data"]["horizon"]),
+            "offline_batches": int(config["offline_data"]["N"]),
+            "matrix_type": config["controller"]["matrix_type"],
+            "t_ini": int(config["controller"]["T_ini"]),
+            "t_f": int(config["controller"]["T_f"]),
+            "raw_batches_shapes": [],
+        }
 
 
 def clone_config(config: dict) -> dict:
@@ -289,17 +367,18 @@ def run_nominal_comparison(config: dict, out_dir: Path | None = None) -> tuple[p
     adaptive = {}
     if config.get("evaluation", {}).get("run_adaptive", True):
         print("[nominal] running adaptive controller")
-        adaptive = evaluate_closed_loop(config, mode="adaptive", bundle=bundle)
+        adaptive = safe_evaluate_closed_loop(config, mode="adaptive", bundle=bundle)
         if out_dir is not None:
             with (out_dir / "adaptive_trace.json").open("w", encoding="utf-8") as handle:
                 json.dump(adaptive, handle, indent=2)
     for epsilon in config["evaluation"]["epsilon_grid"]:
         epsilon_start = time.time()
         print(f"[nominal] running fixed epsilon={epsilon}")
-        res = evaluate_closed_loop(config, mode="fixed", fixed_epsilon=epsilon, bundle=bundle)
+        res = safe_evaluate_closed_loop(config, mode="fixed", fixed_epsilon=epsilon, bundle=bundle)
         records.append(
             {
                 "study": "nominal_comparison",
+                "status": res["status"],
                 "controller_mode": f"fixed_{epsilon}",
                 "epsilon_setting": epsilon,
                 "tracking_error": res["tracking_error"],
@@ -325,6 +404,7 @@ def run_nominal_comparison(config: dict, out_dir: Path | None = None) -> tuple[p
         records.append(
             {
                 "study": "nominal_comparison",
+                "status": adaptive["status"],
                 "controller_mode": "adaptive",
                 "epsilon_setting": adaptive["epsilon_initial"],
                 "tracking_error": adaptive["tracking_error"],
@@ -359,10 +439,11 @@ def run_epsilon_sweep(config: dict, out_dir: Path | None = None) -> pd.DataFrame
         for epsilon in config["evaluation"]["epsilon_grid"]:
             case_start = time.time()
             print(f"[epsilon] running N={n_batches}, epsilon={epsilon}")
-            res = evaluate_closed_loop(local_config, mode="fixed", fixed_epsilon=epsilon, bundle=bundle)
+            res = safe_evaluate_closed_loop(local_config, mode="fixed", fixed_epsilon=epsilon, bundle=bundle)
             records.append(
                 {
                     "study": "epsilon_sweep",
+                    "status": res["status"],
                     "N": int(n_batches),
                     "epsilon": epsilon,
                     "tracking_error": res["tracking_error"],
@@ -391,7 +472,7 @@ def run_horizon_and_matrix_sweep(config: dict, out_dir: Path | None = None) -> p
             bundle = build_bundle(local_config)
             case_start = time.time()
             print(f"[horizon-matrix] running matrix_type={matrix_type}, horizon={horizon}")
-            res = evaluate_closed_loop(
+            res = safe_evaluate_closed_loop(
                 local_config,
                 mode="fixed",
                 fixed_epsilon=config["controller"]["epsilon_nominal"],
@@ -400,6 +481,7 @@ def run_horizon_and_matrix_sweep(config: dict, out_dir: Path | None = None) -> p
             records.append(
                 {
                     "study": "horizon_matrix_sweep",
+                    "status": res["status"],
                     "matrix_type": matrix_type,
                     "offline_horizon": int(horizon),
                     "offline_columns": res["offline_columns"],
@@ -427,7 +509,7 @@ def run_tini_sweep(config: dict, out_dir: Path | None = None) -> pd.DataFrame:
         bundle = build_bundle(local_config)
         case_start = time.time()
         print(f"[tini] running T_ini={t_ini}")
-        res = evaluate_closed_loop(
+        res = safe_evaluate_closed_loop(
             local_config,
             mode="fixed",
             fixed_epsilon=config["controller"]["epsilon_nominal"],
@@ -436,6 +518,7 @@ def run_tini_sweep(config: dict, out_dir: Path | None = None) -> pd.DataFrame:
         records.append(
             {
                 "study": "tini_sweep",
+                "status": res["status"],
                 "t_ini": int(t_ini),
                 "tracking_error": res["tracking_error"],
                 "violation_rate": res["violation_rate"],
@@ -512,6 +595,11 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Override controller.T_ini for single-case execution.",
     )
+    parser.add_argument(
+        "--single-case",
+        action="store_true",
+        help="Run only the explicitly overridden case for the selected study.",
+    )
     return parser.parse_args()
 
 
@@ -528,6 +616,16 @@ def main():
         config["controller"]["matrix_type"] = str(args.override_matrix_type)
     if args.override_tini is not None:
         config["controller"]["T_ini"] = int(args.override_tini)
+    if args.single_case:
+        if args.study == "horizon-matrix":
+            if args.override_horizon is not None:
+                config["evaluation"]["T_grid"] = [int(args.override_horizon)]
+            if args.override_matrix_type is not None:
+                config["evaluation"]["matrix_types"] = [str(args.override_matrix_type)]
+        if args.study == "tini" and args.override_tini is not None:
+            config["evaluation"]["T_ini_grid"] = [int(args.override_tini)]
+        if args.study == "epsilon" and args.override_n_batches is not None:
+            config["evaluation"]["N_grid"] = [int(args.override_n_batches)]
 
     frames: dict[str, pd.DataFrame] = {}
     adaptive_trace: dict = {}
