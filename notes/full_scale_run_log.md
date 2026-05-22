@@ -23,8 +23,9 @@ under `experiments/paper_base.yaml`.
   - note: results are stored in `outputs/full_scale_tini3/paper_style_tini_sweep.csv`
 
 - `adaptive-scenarios`
-  - status: started
-  - note: the first full-scale `noise_jump` comparison (`adaptive` vs `fixed_0.0001`) completed and is stored in `outputs/adaptive_compare_full_noisejump/adaptive_scenario_comparison.csv`
+  - status: `noise_jump` extended and `recovery` started
+  - note: full-scale `noise_jump` now includes `adaptive`, `fixed_0.0001`, `fixed_0.003`, and `fixed_0.02` in `outputs/adaptive_compare_full_noisejump/adaptive_scenario_comparison.csv`
+  - note: the first full-scale `recovery` comparison (`adaptive` vs `fixed_0.0001`) completed and is stored in `outputs/adaptive_compare_full_recovery/adaptive_scenario_comparison.csv`
 
 ## Logging Convention
 

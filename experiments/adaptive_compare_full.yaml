@@ -50,8 +50,19 @@ adaptive_compare:
   fixed_epsilons: [0.0001, 0.003, 0.02]
   scenarios:
     - noise_jump
+    - recovery
+    - bias_shift
 scenario_library:
   noise_jump:
     type: noise_jump
     jump_step: 100
     noise_multiplier: 4.0
+  recovery:
+    type: recovery
+    jump_step: 100
+    recover_step: 180
+    noise_multiplier: 4.0
+  bias_shift:
+    type: bias_shift
+    shift_step: 100
+    bias_vector: [0.15, 0.0, 0.0]
