@@ -8,6 +8,7 @@
 \usepackage{mathtools}
 \usepackage{cite}
 \usepackage{booktabs}
+\usepackage{graphicx}
 \usepackage{microtype}
 \usepackage{hyperref}
 
@@ -315,7 +316,21 @@ The $T_{\mathrm{ini}}$ sweep has now been completed for $T_{\mathrm{ini}} \in \{
 \subsection{Preliminary Adaptive-Radius Results}
 The adaptive-radius study has already produced a first set of full-scale nonstationary comparisons. Under the noise-jump scenario, the adaptive controller achieves tracking error $144.48$, violation rate $0.400$, and tail violation score $0.2387$, while the aggressive fixed-radius baseline with $\epsilon=10^{-4}$ yields tracking error $161.46$, violation rate $0.784$, and tail violation score $0.3882$. A moderate fixed radius $\epsilon=0.02$ reduces the violation rate relative to the aggressive baseline, but still remains less safe than the adaptive controller, with tracking error $138.24$, violation rate $0.480$, and tail violation score $0.2813$. The intermediate fixed-radius case $\epsilon=0.003$ performs particularly poorly in the current run, with tracking error $185.99$ and violation rate $0.780$. These results reinforce that a nominally reasonable fixed radius may still fail to generalize well under disturbance changes.
 
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/adaptive_compare_noise_jump.pdf}
+    \caption{Full-scale comparison in the noise-jump scenario. The adaptive controller reduces violation frequency and tail-risk severity relative to aggressive fixed-radius baselines.}
+    \label{fig:noise-jump-compare}
+\end{figure}
+
 The second full-scale nonstationary comparison considers a recovery scenario in which the uncertainty intensity first increases and then later returns to its nominal level. In this case, the adaptive controller achieves tracking error $133.35$, violation rate $0.328$, and tail violation score $0.2387$, while the aggressive fixed-radius baseline with $\epsilon=10^{-4}$ yields tracking error $147.90$, violation rate $0.784$, and tail violation score $0.3233$. This is consistent with the intended behavior of the adaptive mechanism: it can enlarge the ambiguity radius when uncertainty increases and avoid remaining permanently locked to an overly optimistic fixed setting.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/adaptive_compare_recovery.pdf}
+    \caption{Full-scale comparison in the recovery scenario. The adaptive controller maintains a more favorable performance-safety trade-off when uncertainty increases and later relaxes.}
+    \label{fig:recovery-compare}
+\end{figure}
 
 These preliminary results do not yet constitute the final experimental section, but they already validate the main research direction. First, fixed-radius DR-DeePC exhibits substantial sensitivity to ambiguity-radius choice. Second, repeated data batches and initialization-window design materially affect robustness outcomes. Third, the proposed adaptive-radius mechanism appears capable of reducing violation frequency and tail-risk severity in a nonstationary scenario without altering the inner DR-DeePC formulation.
 
