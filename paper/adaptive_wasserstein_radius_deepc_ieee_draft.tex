@@ -309,9 +309,30 @@ The current implementation already supports the same core sensitivity studies th
 \subsection{Fixed-Radius Baseline Observations}
 The full-scale nominal radius sweep already shows a clear performance-safety trade-off. For example, a very small fixed radius $\epsilon=10^{-4}$ yields tracking error $127.31$ but a high violation rate of $0.784$, whereas a more conservative fixed radius $\epsilon=0.02$ reduces the violation rate to $0.396$ and yields tracking error $118.20$. These preliminary results confirm the practical importance of radius selection and support the claim that a single fixed ambiguity radius may be inadequate across operating regimes.
 
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/baseline_nominal_epsilon.pdf}
+    \caption{Full-scale nominal sensitivity to the fixed Wasserstein radius. In the revised plotting style, the fixed-radius results are shown as parameter curves and the adaptive controller is shown as a horizontal reference.}
+    \label{fig:baseline-nominal-epsilon}
+\end{figure}
+
 The batch-count study also indicates that repeated offline experiments matter. In the nominal comparison, the adaptive controller with $N=10$ achieves tracking error $120.36$ and violation rate $0.324$, whereas the analogous $N=1$ adaptive setting yields tracking error $147.87$ and violation rate $0.572$. This is consistent with the intuition that richer repeated data improve the reliability of the empirical distribution and reduce sensitivity to ambiguity-set misspecification.
 
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/baseline_n_comparison.pdf}
+    \caption{Effect of the number of repeated offline experiments on the nominal fixed-radius sweep. The larger batch count improves the performance-risk profile for several radius choices.}
+    \label{fig:baseline-n-comparison}
+\end{figure}
+
 The $T_{\mathrm{ini}}$ sweep has now been completed for $T_{\mathrm{ini}} \in \{1,\dots,10\}$ and reveals a strongly non-monotone dependence on the initialization window. Some settings, such as $T_{\mathrm{ini}}=5$ and $T_{\mathrm{ini}}=8$, produce zero empirical violations in the current benchmark, whereas other settings produce both large tracking errors and large tail-risk scores. This reinforces the need to separate radius adaptation effects from data-window design effects when interpreting closed-loop performance.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/baseline_tini_sweep.pdf}
+    \caption{Sensitivity of the full-scale benchmark to the initialization window $T_{\mathrm{ini}}$. The dependence is highly non-monotone, which motivates analyzing adaptive-radius effects separately from data-window tuning effects.}
+    \label{fig:baseline-tini}
+\end{figure}
 
 \subsection{Preliminary Adaptive-Radius Results}
 The adaptive-radius study has already produced a first set of full-scale nonstationary comparisons. Under the noise-jump scenario, the adaptive controller achieves tracking error $144.48$, violation rate $0.400$, and tail violation score $0.2387$, while the aggressive fixed-radius baseline with $\epsilon=10^{-4}$ yields tracking error $161.46$, violation rate $0.784$, and tail violation score $0.3882$. A moderate fixed radius $\epsilon=0.02$ reduces the violation rate relative to the aggressive baseline, but still remains less safe than the adaptive controller, with tracking error $138.24$, violation rate $0.480$, and tail violation score $0.2813$. The intermediate fixed-radius case $\epsilon=0.003$ performs particularly poorly in the current run, with tracking error $185.99$ and violation rate $0.780$. These results reinforce that a nominally reasonable fixed radius may still fail to generalize well under disturbance changes.
@@ -332,7 +353,7 @@ The second full-scale nonstationary comparison considers a recovery scenario in 
     \label{fig:recovery-compare}
 \end{figure}
 
-The third full-scale nonstationary comparison introduces a measurement-bias shift. In the currently completed comparison, the adaptive controller achieves tracking error $119.03$, violation rate $0.304$, and tail violation score $0.2312$, whereas the aggressive fixed-radius baseline with $\epsilon=10^{-4}$ yields tracking error $119.61$, violation rate $0.784$, and tail violation score $0.2869$. This result is encouraging because it suggests that the adaptive controller can retain comparable nominal-performance levels while significantly reducing the frequency and severity of constraint violations under biased measurements.
+The third full-scale nonstationary comparison introduces a measurement-bias shift. In this case, the adaptive controller achieves tracking error $119.03$, violation rate $0.304$, and tail violation score $0.2312$. The aggressive fixed-radius baseline with $\epsilon=10^{-4}$ yields tracking error $119.61$, violation rate $0.784$, and tail violation score $0.2869$, while the intermediate fixed-radius case $\epsilon=0.003$ degrades further to tracking error $132.61$ with violation rate $0.780$. A more conservative fixed radius $\epsilon=0.02$ improves the tracking error to $115.14$ and reduces the violation rate to $0.384$, but still remains less safe than the adaptive controller. This result is encouraging because it suggests that the adaptive controller can retain comparable nominal-performance levels while significantly reducing the frequency and severity of constraint violations under biased measurements.
 
 \begin{figure}[t]
     \centering
