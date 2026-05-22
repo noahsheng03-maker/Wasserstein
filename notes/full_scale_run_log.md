@@ -26,7 +26,8 @@ under `experiments/paper_base.yaml`.
   - status: `noise_jump` and `recovery` extended; `bias_shift` started
   - note: full-scale `noise_jump` now includes `adaptive`, `fixed_0.0001`, `fixed_0.003`, and `fixed_0.02` in `outputs/adaptive_compare_full_noisejump/adaptive_scenario_comparison.csv`
   - note: full-scale `recovery` now includes `adaptive`, `fixed_0.0001`, `fixed_0.003`, and `fixed_0.02` in `outputs/adaptive_compare_full_recovery/adaptive_scenario_comparison.csv`
-  - note: the first full-scale `bias_shift` comparison (`adaptive` vs `fixed_0.0001`) completed and is stored in `outputs/adaptive_compare_full_biasshift/adaptive_scenario_comparison.csv`
+  - note: full-scale `bias_shift` now includes `adaptive`, `fixed_0.0001`, `fixed_0.003`, and `fixed_0.02` in `outputs/adaptive_compare_full_biasshift/adaptive_scenario_comparison.csv`
+  - note: adaptive trace files are now persisted per scenario and used to generate radius-evolution figures
 
 ## Logging Convention
 

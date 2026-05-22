@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import json
 import sys
 from pathlib import Path
 
@@ -68,6 +69,8 @@ def main() -> None:
         if not args.skip_adaptive:
             print(f"[adaptive-compare] running scenario={scenario_name} mode=adaptive")
             adaptive = evaluate_closed_loop(scenario_cfg, mode="adaptive", bundle=bundle)
+            with (out_dir / f"{scenario_name}_adaptive_trace.json").open("w", encoding="utf-8") as handle:
+                json.dump(adaptive, handle, indent=2)
             records.append(
                 {
                     "scenario": scenario_name,
