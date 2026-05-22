@@ -323,13 +323,22 @@ The adaptive-radius study has already produced a first set of full-scale nonstat
     \label{fig:noise-jump-compare}
 \end{figure}
 
-The second full-scale nonstationary comparison considers a recovery scenario in which the uncertainty intensity first increases and then later returns to its nominal level. In this case, the adaptive controller achieves tracking error $133.35$, violation rate $0.328$, and tail violation score $0.2387$, while the aggressive fixed-radius baseline with $\epsilon=10^{-4}$ yields tracking error $147.90$, violation rate $0.784$, and tail violation score $0.3233$. This is consistent with the intended behavior of the adaptive mechanism: it can enlarge the ambiguity radius when uncertainty increases and avoid remaining permanently locked to an overly optimistic fixed setting.
+The second full-scale nonstationary comparison considers a recovery scenario in which the uncertainty intensity first increases and then later returns to its nominal level. In this case, the adaptive controller achieves tracking error $133.35$, violation rate $0.328$, and tail violation score $0.2387$, while the aggressive fixed-radius baseline with $\epsilon=10^{-4}$ yields tracking error $147.90$, violation rate $0.784$, and tail violation score $0.3233$. A more conservative fixed choice $\epsilon=0.02$ reduces the violation rate to $0.408$ and improves the tracking error to $129.15$, but still remains inferior to the adaptive controller in both violation frequency and tail risk. The intermediate fixed-radius case $\epsilon=0.003$ again performs poorly, with tracking error $170.80$ and violation rate $0.780$. This is consistent with the intended behavior of the adaptive mechanism: it can enlarge the ambiguity radius when uncertainty increases and avoid remaining permanently locked to an overly optimistic fixed setting.
 
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{figures/adaptive_compare_recovery.pdf}
     \caption{Full-scale comparison in the recovery scenario. The adaptive controller maintains a more favorable performance-safety trade-off when uncertainty increases and later relaxes.}
     \label{fig:recovery-compare}
+\end{figure}
+
+The third full-scale nonstationary comparison introduces a measurement-bias shift. In the currently completed comparison, the adaptive controller achieves tracking error $119.03$, violation rate $0.304$, and tail violation score $0.2312$, whereas the aggressive fixed-radius baseline with $\epsilon=10^{-4}$ yields tracking error $119.61$, violation rate $0.784$, and tail violation score $0.2869$. This result is encouraging because it suggests that the adaptive controller can retain comparable nominal-performance levels while significantly reducing the frequency and severity of constraint violations under biased measurements.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/adaptive_compare_bias_shift.pdf}
+    \caption{Full-scale comparison in the bias-shift scenario. The adaptive controller preserves tracking performance while substantially reducing safety violations relative to the aggressive fixed-radius baseline.}
+    \label{fig:bias-shift-compare}
 \end{figure}
 
 These preliminary results do not yet constitute the final experimental section, but they already validate the main research direction. First, fixed-radius DR-DeePC exhibits substantial sensitivity to ambiguity-radius choice. Second, repeated data batches and initialization-window design materially affect robustness outcomes. Third, the proposed adaptive-radius mechanism appears capable of reducing violation frequency and tail-risk severity in a nonstationary scenario without altering the inner DR-DeePC formulation.
