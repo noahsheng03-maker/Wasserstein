@@ -33,7 +33,7 @@
 \maketitle
 
 \begin{abstract}
-Distributionally robust data-enabled predictive control (DR-DeePC) provides a promising framework for controlling unknown stochastic systems directly from input-output data while explicitly accounting for distributional ambiguity and output safety constraints. A critical design parameter in Wasserstein-based DR-DeePC is the ambiguity radius, which governs the trade-off between out-of-sample robustness and closed-loop control performance. Existing approaches typically rely on conservative theoretical bounds or manual tuning, limiting their practical deployment in time-varying and safety-critical settings. This paper proposes an adaptive Wasserstein radius selection framework for DR-DeePC. The method combines an offline data-driven initialization step with an online radius adaptation law driven by prediction mismatch, constraint stress, and distribution shift indicators. A safeguarded projection mechanism is incorporated to prevent the radius from shrinking below a reliability-preserving threshold. The resulting controller preserves the tractable structure of DR-DeePC while improving adaptability to changes in uncertainty statistics. We outline the problem formulation, the adaptive update mechanism, and the expected evaluation methodology. The proposed framework aims to reduce tuning effort and improve the performance-safety trade-off of DR-DeePC under nonstationary uncertainty.
+Distributionally robust data-enabled predictive control (DR-DeePC) provides a promising framework for controlling unknown stochastic linear time-invariant systems directly from input-output data while explicitly accounting for distributional ambiguity and output safety constraints. A critical design parameter in Wasserstein-based DR-DeePC is the ambiguity radius, which governs the trade-off between out-of-sample robustness and closed-loop control performance. Existing approaches typically rely on conservative theoretical bounds or manual tuning, limiting their practical deployment in time-varying and safety-critical settings. This paper proposes an adaptive Wasserstein radius selection framework for DR-DeePC. The method combines an offline data-driven initialization step with an online radius adaptation law driven by prediction mismatch, constraint stress, and distribution shift indicators. A safeguarded projection mechanism is incorporated to prevent the radius from shrinking below a reliability-preserving threshold. The resulting controller preserves the tractable structure of DR-DeePC while improving adaptability to changes in uncertainty statistics. We outline the problem formulation, the adaptive update mechanism, and the expected evaluation methodology. The proposed framework aims to reduce tuning effort and improve the performance-safety trade-off of DR-DeePC under nonstationary uncertainty. A nonlinear quadcopter benchmark is used only as an empirical stress test in the experimental section, not as the domain of validity of the DeePC parametrization.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -49,7 +49,7 @@ Despite its elegance, DeePC becomes significantly more challenging in stochastic
 
 A central but unresolved issue in Wasserstein DR-DeePC is the choice of the ambiguity radius. The radius determines the size of the uncertainty set. A radius that is too small may lead to optimistic designs that underperform when the true distribution differs from the empirical one. A radius that is too large can induce severe conservatism, resulting in degraded tracking performance, reduced control authority, and unnecessary constraint margins. Existing practice often relies on either theoretical concentration bounds, which are frequently too conservative for control applications, or empirical grid search, which is computationally expensive and unsuitable for online deployment.
 
-This paper focuses on the adaptive selection of the Wasserstein ambiguity radius in distributionally robust DeePC. The motivation is that uncertainty statistics may vary over time, and therefore a fixed ambiguity radius is unlikely to remain appropriate throughout closed-loop operation. Instead, the ambiguity radius should increase when model mismatch, distribution shift, or constraint stress become more pronounced, and it should decrease when the system returns to nominal behavior in order to recover performance.
+This paper focuses on the adaptive selection of the Wasserstein ambiguity radius in distributionally robust DeePC. Throughout the theoretical development, we restrict attention to the stochastic LTI setting in which the standard DeePC trajectory parametrization is justified by the behavioral systems framework. The motivation is that uncertainty statistics may vary over time, and therefore a fixed ambiguity radius is unlikely to remain appropriate throughout closed-loop operation. Instead, the ambiguity radius should increase when model mismatch, distribution shift, or constraint stress become more pronounced, and it should decrease when the system returns to nominal behavior in order to recover performance.
 
 The main idea of this work is to introduce a two-layer architecture. The inner layer solves a standard Wasserstein DR-DeePC problem for a given radius. The outer layer adjusts the radius online using signals computed from recent closed-loop data. These signals include prediction mismatch, output constraint stress, and a measure of discrepancy between recent observations and the offline data distribution. To prevent unsafe underestimation of uncertainty, the online adaptation is combined with a safeguarded lower bound calibrated offline. This preserves the computational tractability of DR-DeePC while making the robustness level responsive to operating conditions.
 
@@ -67,17 +67,26 @@ The remainder of this draft is organized as follows. Section~\ref{sec:method} pr
 \label{sec:method}
 
 \subsection{Formal Setup}
-Consider an unknown discrete-time stochastic system
+We consider an unknown discrete-time stochastic linear time-invariant system
 \begin{equation}
-x_{t+1} = f(x_t,u_t,w_t), \qquad y_t = h(x_t) + v_t,
+x_{t+1} = A x_t + B u_t + E w_t, \qquad y_t = C x_t + D u_t + F v_t,
 \end{equation}
-where $u_t \in \mathbb{R}^{m}$ is the input, $y_t \in \mathbb{R}^{p}$ is the measured output, and $w_t,v_t$ are process and measurement disturbances. The controller does not assume explicit knowledge of $f$ and instead relies on offline input-output data collected from repeated experiments.
+where $u_t \in \mathbb{R}^{m}$ is the input, $y_t \in \mathbb{R}^{p}$ is the measured output, and $w_t,v_t$ are process and measurement disturbances. The matrices $(A,B,C,D,E,F)$ are unknown to the controller. Instead of identifying them explicitly, the controller relies on offline input-output data collected from repeated experiments.
+
+\begin{assumption}
+\label{ass:lti}
+The underlying plant is controllable and time invariant, and the offline input is persistently exciting of sufficiently high order so that the standard DeePC trajectory parametrization is well defined over the horizon pair $(T_{\mathrm{ini}},T_f)$.
+\end{assumption}
+
+\begin{remark}
+Assumption~\ref{ass:lti} is the standard behavioral-systems assumption behind DeePC. It is precisely this LTI setting that justifies the use of the trajectory coefficient vector $g$ and the data matrices $(U_p,Y_p,U_f,Y_f)$. In contrast, the nonlinear quadcopter considered later is used only as an experimental benchmark to test empirical robustness of the controller design.
+\end{remark}
 
 Let $u^{(i)}_{0:T-1}$ and $y^{(i)}_{0:T-1}$ denote the $i$th offline trajectory, $i \in \{1,\dots,N\}$. For a chosen initialization length $T_{\mathrm{ini}}$ and prediction horizon $T_f$, these trajectories are arranged into DeePC data matrices
 \begin{equation}
 U_p,\; Y_p,\; U_f,\; Y_f,
 \end{equation}
-where the past blocks $(U_p,Y_p)$ encode the initialization window and the future blocks $(U_f,Y_f)$ encode prediction trajectories. In the standard DeePC parametrization, a candidate future trajectory is represented by a coefficient vector $g$ satisfying
+where the past blocks $(U_p,Y_p)$ encode the initialization window and the future blocks $(U_f,Y_f)$ encode prediction trajectories. Under Assumption~\ref{ass:lti}, a candidate future trajectory is represented by a coefficient vector $g$ satisfying
 \begin{equation}
 u_{\mathrm{ini}} = U_p g,\qquad y_{\mathrm{ini}} \approx Y_p g,\qquad
 u = U_f g,\qquad y = Y_f g.
@@ -107,7 +116,7 @@ denote the admissible input and output sets over the prediction horizon. For a r
 \ell(u,y)
 :=
 \|y-y^{\mathrm{ref}}\|_{Q}^{2}
-\|u-u^{\mathrm{ref}}\|_{R}^{2},
+ + \|u-u^{\mathrm{ref}}\|_{R}^{2},
 \end{equation}
 where $Q\succeq 0$ and $R\succ 0$ are weighting matrices and $u^{\mathrm{ref}}$ denotes a nominal input around the hovering or equilibrium operating condition.
 
@@ -302,7 +311,7 @@ To evaluate the method, we will compare the proposed adaptive-radius DR-DeePC ag
 \label{sec:experiments}
 
 \subsection{Paper-Style Evaluation Setup}
-Our current evaluation protocol follows the structure of the reference DR-DeePC study as closely as possible within the present software stack. The controller is tested in a receding-horizon setting with prediction horizon $T_f = 25$, initialization window $T_{\mathrm{ini}} = 6$, simulation length $250$ steps, and repeated offline experiments of length $15500$. Unless otherwise stated, the Page matrix representation is used with $N=10$ offline batches, output box constraints $[-0.6,1.6]^3$, and Wasserstein nominal radius $\epsilon=0.003$. The inner DR-DeePC problem is solved using an SCS-based conic formulation with warm-started repeated solves.
+Our current evaluation protocol follows the structure of the reference DR-DeePC study as closely as possible within the present software stack. The theoretical controller design remains tied to the stochastic LTI DeePC formulation of Section~\ref{sec:method}. For experimental validation, however, we also use a high-fidelity nonlinear quadcopter-style benchmark as an empirical stress test, following the spirit of the ETH Zurich reference study. The controller is tested in a receding-horizon setting with prediction horizon $T_f = 25$, initialization window $T_{\mathrm{ini}} = 6$, simulation length $250$ steps, and repeated offline experiments of length $15500$. Unless otherwise stated, the Page matrix representation is used with $N=10$ offline batches, output box constraints $[-0.6,1.6]^3$, and Wasserstein nominal radius $\epsilon=0.003$. The inner DR-DeePC problem is solved using an SCS-based conic formulation with warm-started repeated solves.
 
 The current implementation already supports the same core sensitivity studies that motivate the proposed adaptive-radius extension: nominal radius sweeps, batch-count comparisons, horizon/matrix comparisons, and $T_{\mathrm{ini}}$ sweeps. These studies are important because they quantify how sensitive Wasserstein DR-DeePC is to fixed radius selection and how strongly the behavior depends on data richness and trajectory embedding choices.
 
