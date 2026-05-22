@@ -43,9 +43,9 @@ Data-enabled predictive control, distributionally robust optimization, Wasserste
 \section{Introduction}
 Model predictive control (MPC) is one of the most successful frameworks for constrained optimal control because it optimizes future control actions using explicit predictions of system behavior while handling state and input constraints in a systematic manner. However, classical MPC depends heavily on the availability of an accurate predictive model. In many real-world applications, including robotics, power electronics, transportation, and energy systems, deriving and maintaining a sufficiently accurate model can be difficult, expensive, or even infeasible. These challenges have motivated the rapid development of data-driven predictive control methods.
 
-Among such methods, data-enabled predictive control (DeePC) is particularly attractive because it avoids explicit model identification and directly uses historical input-output trajectories to synthesize future control actions. The key insight behind DeePC is that for a controllable linear time-invariant system, sufficiently rich historical data can be organized into a trajectory subspace from which future trajectories can be predicted. This allows DeePC to mimic model predictive control behavior while bypassing an explicit parametric model.
+Among such methods, data-enabled predictive control (DeePC) is particularly attractive because it avoids explicit model identification and directly uses historical input-output trajectories to synthesize future control actions \cite{Coulson2019DeePC}. The key insight behind DeePC is that for a controllable linear time-invariant system, sufficiently rich historical data can be organized into a trajectory subspace from which future trajectories can be predicted. This allows DeePC to mimic model predictive control behavior while bypassing an explicit parametric model.
 
-Despite its elegance, DeePC becomes significantly more challenging in stochastic settings. In practice, measured data are corrupted by noise, the true disturbance distribution is unknown, and constraint satisfaction must be addressed under uncertainty. Distributionally robust DeePC addresses this issue by replacing a single estimated disturbance distribution with an ambiguity set of plausible distributions. In the Wasserstein-based formulation, the ambiguity set is chosen as a Wasserstein ball centered at the empirical distribution of the collected data. This yields a tractable optimization problem with probabilistic out-of-sample guarantees and explicit robustness against sample mismatch.
+Despite its elegance, DeePC becomes significantly more challenging in stochastic settings. In practice, measured data are corrupted by noise, the true disturbance distribution is unknown, and constraint satisfaction must be addressed under uncertainty. Distributionally robust DeePC addresses this issue by replacing a single estimated disturbance distribution with an ambiguity set of plausible distributions \cite{Coulson2019Regularized,Coulson2022DRCCDeePC}. In the Wasserstein-based formulation, the ambiguity set is chosen as a Wasserstein ball centered at the empirical distribution of the collected data \cite{EsfahaniKuhn2018}. This yields a tractable optimization problem with probabilistic out-of-sample guarantees and explicit robustness against sample mismatch.
 
 A central but unresolved issue in Wasserstein DR-DeePC is the choice of the ambiguity radius. The radius determines the size of the uncertainty set. A radius that is too small may lead to optimistic designs that underperform when the true distribution differs from the empirical one. A radius that is too large can induce severe conservatism, resulting in degraded tracking performance, reduced control authority, and unnecessary constraint margins. Existing practice often relies on either theoretical concentration bounds, which are frequently too conservative for control applications, or empirical grid search, which is computationally expensive and unsuitable for online deployment.
 
@@ -67,7 +67,7 @@ The remainder of this draft is organized as follows. Section~\ref{sec:method} pr
 \label{sec:method}
 
 \subsection{Formal Setup}
-We consider an unknown discrete-time stochastic linear time-invariant system
+We consider an unknown discrete-time stochastic linear time-invariant system \cite{Coulson2022DRCCDeePC}
 \begin{equation}
 x_{t+1} = A x_t + B u_t + E w_t, \qquad y_t = C x_t + D u_t + F v_t,
 \end{equation}
@@ -79,7 +79,7 @@ The underlying plant is controllable and time invariant, and the offline input i
 \end{assumption}
 
 \begin{remark}
-Assumption~\ref{ass:lti} is the standard behavioral-systems assumption behind DeePC. It is precisely this LTI setting that justifies the use of the trajectory coefficient vector $g$ and the data matrices $(U_p,Y_p,U_f,Y_f)$. In contrast, the nonlinear quadcopter considered later is used only as an experimental benchmark to test empirical robustness of the controller design.
+Assumption~\ref{ass:lti} is the standard behavioral-systems assumption behind DeePC \cite{Coulson2019DeePC}. It is precisely this LTI setting that justifies the use of the trajectory coefficient vector $g$ and the data matrices $(U_p,Y_p,U_f,Y_f)$. In contrast, the nonlinear quadcopter considered later is used only as an experimental benchmark to test empirical robustness of the controller design.
 \end{remark}
 
 Let $u^{(i)}_{0:T-1}$ and $y^{(i)}_{0:T-1}$ denote the $i$th offline trajectory, $i \in \{1,\dots,N\}$. For a chosen initialization length $T_{\mathrm{ini}}$ and prediction horizon $T_f$, these trajectories are arranged into DeePC data matrices
@@ -166,7 +166,7 @@ Under Assumption~\ref{ass:compact}, the stage cost $\ell(u,y)$ and the constrain
 \end{assumption}
 
 \begin{remark}
-Assumption~\ref{ass:lipschitz} is standard in Wasserstein distributionally robust optimization. It excludes pathological cases in which the ambiguity radius is varied over regions where the inner DR-DeePC problem loses convexity or feasibility for trivial reasons unrelated to the adaptive mechanism itself.
+Assumption~\ref{ass:lipschitz} is standard in Wasserstein distributionally robust optimization \cite{EsfahaniKuhn2018}. It excludes pathological cases in which the ambiguity radius is varied over regions where the inner DR-DeePC problem loses convexity or feasibility for trivial reasons unrelated to the adaptive mechanism itself.
 \end{remark}
 
 \subsection{Offline Radius Initialization}
@@ -200,7 +200,7 @@ The second indicator is the constraint stress
 \end{equation}
 where $h(y_k) \le 0$ denotes the output safety condition. This quantity captures how strongly the closed-loop trajectory is approaching or violating the desired safe set.
 
-The third indicator is a distribution shift estimate. Let $\mathcal{D}_{\mathrm{ref}}$ denote a reference dataset derived from offline trajectories, and let $\mathcal{D}_t$ denote a recent online data window. A discrepancy statistic $\bar d_t$ may be computed using a low-dimensional feature map or a sample Wasserstein distance surrogate between these two windows. An increase in $\bar d_t$ suggests that current operating conditions are no longer well represented by the offline training distribution.
+The third indicator is a distribution shift estimate. Let $\mathcal{D}_{\mathrm{ref}}$ denote a reference dataset derived from offline trajectories, and let $\mathcal{D}_t$ denote a recent online data window. A discrepancy statistic $\bar d_t$ may be computed using a low-dimensional feature map or a sample Wasserstein distance surrogate between these two windows. An increase in $\bar d_t$ suggests that current operating conditions are no longer well represented by the offline training distribution. This type of Wasserstein-based risk monitoring is aligned with the broader literature on data-driven chance-constrained optimization under ambiguity sets \cite{HotaCherukuriLygeros2019}.
 
 These three indicators are combined into an update law of the form
 \begin{equation}
@@ -311,7 +311,7 @@ To evaluate the method, we will compare the proposed adaptive-radius DR-DeePC ag
 \label{sec:experiments}
 
 \subsection{Paper-Style Evaluation Setup}
-Our current evaluation protocol follows the structure of the reference DR-DeePC study as closely as possible within the present software stack. The theoretical controller design remains tied to the stochastic LTI DeePC formulation of Section~\ref{sec:method}. For experimental validation, however, we also use a high-fidelity nonlinear quadcopter-style benchmark as an empirical stress test, following the spirit of the ETH Zurich reference study. The controller is tested in a receding-horizon setting with prediction horizon $T_f = 25$, initialization window $T_{\mathrm{ini}} = 6$, simulation length $250$ steps, and repeated offline experiments of length $15500$. Unless otherwise stated, the Page matrix representation is used with $N=10$ offline batches, output box constraints $[-0.6,1.6]^3$, and Wasserstein nominal radius $\epsilon=0.003$. The inner DR-DeePC problem is solved using an SCS-based conic formulation with warm-started repeated solves.
+Our current evaluation protocol follows the structure of the reference DR-DeePC study as closely as possible within the present software stack \cite{Coulson2022DRCCDeePC}. The theoretical controller design remains tied to the stochastic LTI DeePC formulation of Section~\ref{sec:method}. For experimental validation, however, we also use a high-fidelity nonlinear quadcopter-style benchmark as an empirical stress test, following the spirit of the ETH Zurich reference study. The controller is tested in a receding-horizon setting with prediction horizon $T_f = 25$, initialization window $T_{\mathrm{ini}} = 6$, simulation length $250$ steps, and repeated offline experiments of length $15500$. Unless otherwise stated, the Page matrix representation is used with $N=10$ offline batches, output box constraints $[-0.6,1.6]^3$, and Wasserstein nominal radius $\epsilon=0.003$. The inner DR-DeePC problem is solved using an SCS-based conic formulation with warm-started repeated solves.
 
 The current implementation already supports the same core sensitivity studies that motivate the proposed adaptive-radius extension: nominal radius sweeps, batch-count comparisons, horizon/matrix comparisons, and $T_{\mathrm{ini}}$ sweeps. These studies are important because they quantify how sensitive Wasserstein DR-DeePC is to fixed radius selection and how strongly the behavior depends on data richness and trajectory embedding choices.
 
@@ -424,6 +424,9 @@ At the same time, the experiments also reveal an important nuance: a relatively 
 \section{Concluding Remark for the Draft}
 This draft outlines a practical and research-relevant extension of Wasserstein distributionally robust DeePC. The proposed direction does not alter the inner DeePC structure; instead, it equips the controller with an adaptive mechanism for selecting the ambiguity radius based on observed closed-loop behavior. This makes the resulting controller more suitable for real operating environments where uncertainty statistics are not stationary.
 
-The current state of the study is already sufficient to support a coherent paper narrative: the fixed-radius baseline has been characterized through nominal, batch-count, and initialization-window studies; the adaptive controller has been evaluated in multiple nonstationary scenarios; and the manuscript now contains a formal problem statement, analytical lemmas, and paper-style figures. The remaining experimental refinements mainly concern richer trace-level visualization and polishing, rather than a missing conceptual core. From this point onward, the writing can transition naturally from method development into full paper assembly, including bibliography integration, figure cross-referencing, and tightening of the theoretical claims.
+The current state of the study is already sufficient to support a coherent paper narrative: the fixed-radius baseline has been characterized through nominal, batch-count, and initialization-window studies; the adaptive controller has been evaluated in multiple nonstationary scenarios; and the manuscript now contains a formal problem statement, analytical lemmas, and paper-style figures. The remaining experimental refinements mainly concern richer trace-level visualization and polishing, rather than a missing conceptual core. From this point onward, the writing can transition naturally from method development into full paper assembly, including figure cross-referencing and tightening of the theoretical claims.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
 
 \end{document}
